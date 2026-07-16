@@ -114,10 +114,10 @@ click from the code that makes it true.
 | 3. Compute tier | From lifetime giving, one deterministic lookup | [`donor_rules.py:compute_tier`](scripts/donor_rules.py), [`donor_rules.js:computeTier`](donor_rules.js) |
 | 4. Compute the ask | Fixed formula, fixed operation order, full per-donor trace | [`donor_rules.py:compute_ask`](scripts/donor_rules.py), [`donor_rules.js:computeAsk`](donor_rules.js) |
 | 5. Pick tone and salutation | Tier/Lapsed voice table; salutation format by tier, with a mandatory-review flag instead of a guess when a title is missing | [`generate_letters.py:build_salutation`](scripts/generate_letters.py), [`app.js:buildSalutation`](app.js) |
-| 6. Assign a Platinum relationship manager | Named person signs the letter if one is on file; otherwise the campaign default signs it, visibly, under mandatory review | [`generate_letters.py:build_letter_model`](scripts/generate_letters.py), [`app.js:buildLetterModel`](app.js) |
+| 6. Assign a Platinum relationship manager | Named person signs the letter if one is on file; otherwise the campaign default signs it, visibly, under mandatory review (the interactive tool goes further, see below) | [`generate_letters.py:build_letter_model`](scripts/generate_letters.py), [`app.js:buildLetterModel`](app.js) |
 | 7. Fill and validate the letter template | Every placeholder from verified fields, structurally checked before it ever renders | [`generate_letters.py:validate_letter_model`](scripts/generate_letters.py), [`app.js:validateLetterModel`](app.js) |
 | 8. Produce one HTML letter per donor, all of them | Every donor gets a file, no exceptions: a real solicitation where possible, otherwise a clearly-marked internal review notice stating why and who it's assigned to, never silence | [`generate_letters.py:build_placeholder_html`](scripts/generate_letters.py), [`app.js:buildPlaceholderHtml`](app.js) |
-| 9. Gate before anything ships | Mandatory review (Platinum, tier corrections, ask exceeds gift, missing title, missing relationship manager, lapsed major donors) must clear before export unlocks | [`donor_rules.py:review_level`](scripts/donor_rules.py), [`ui.js:exportReadiness`](ui.js) |
+| 9. Gate before anything ships | Mandatory review (Platinum, tier corrections, ask exceeds gift, missing title, lapsed major donors) must be confirmed, and every Platinum donor must have a relationship manager explicitly assigned (not just flagged), before export unlocks in the interactive tool | [`donor_rules.py:review_level`](scripts/donor_rules.py), [`ui.js:exportReadiness`](ui.js) |
 
 ## Running the Python pipeline
 
@@ -160,13 +160,24 @@ conflict (a donor_id already present) is never resolved automatically;
 it's shown field by field for a person to decide. Sort any column, and
 use "mark all shown reviewed" to bulk-confirm donors matching your
 current filter, only after naming every one of them in a confirmation
-dialog first, never silently. Every load, edit, merge, and confirmation
-is recorded in an in-page change log. A numbered step tracker and a
-guided tour (top of the page) walk through the whole flow.
+dialog first, never silently. Every load, edit, merge, confirmation, and
+relationship-manager assignment is recorded in an in-page change log. A
+numbered step tracker and a guided walkthrough (top of the page) go
+through every input in the order you'd actually set it, why it matters,
+and what changes if you change it, prompting you to try the two with the
+widest effect (the as-of date, campaign type) and showing a live impact
+summary of exactly what shifted.
+
+A Platinum donor with no relationship manager assigned blocks export
+outright, not just a flag to click past: a dedicated panel lists every
+one still missing, with a field to name a real person or a button to
+explicitly accept the campaign's own signer as the assigned default,
+either way logged by name, not folded into a generic edit entry.
 
 Export is a single button, disabled until every data exception is fixed,
-every merge conflict is resolved, and every flagged donor is confirmed;
-the export panel names exactly what's still outstanding and links you
+every merge conflict is resolved, every Platinum donor has a
+relationship manager on file, and every flagged donor is confirmed; the
+export panel names exactly what's still outstanding and links you
 straight to it. Once unlocked, it produces one zip: the review manifest,
 the full modified donor data, the change log, one HTML file per donor
 with no exceptions (a real solicitation where possible, otherwise a

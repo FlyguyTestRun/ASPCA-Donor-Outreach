@@ -175,15 +175,26 @@ not Gold's. When a Platinum donor's `relationship_manager` field is set,
 that person signs the letter (`signer_name`/`signer_title` become their
 name and "Personal Relationship Manager") instead of the campaign's
 generic signer, since the entire point of naming one is that the letter
-comes from a specific human this donor is meant to know. When it is
-blank, the letter still generates, signed by the campaign's normal
-signer as a visible default, and `validate_input.py` forces mandatory
-review on that donor specifically for this reason (not just because
-Platinum is always mandatory anyway) so a fundraiser has to notice and
-either name someone real or knowingly accept the default. A relationship
-manager name is still never invented by the system itself, for any
-tier; assigning one is a human decision this gate exists to surface,
-not something the pipeline guesses at.
+comes from a specific human this donor is meant to know. A relationship
+manager name is never invented by the system itself, for any tier;
+assigning one is a human decision, not something the pipeline guesses at.
+
+The batch pipeline (`generate_letters.py`) and the interactive tool
+enforce this differently, because one runs unattended and the other has
+a person at the keyboard. The batch path generates the letter regardless,
+signed by the campaign's default signer when the field is blank, and
+flags mandatory review with a specific, named reason so it surfaces in
+`manifest.csv`. The interactive tool goes further: a Platinum donor with
+a blank `relationship_manager` cannot be part of an export at all
+(`ui.js`, `exportReadiness`'s `rmMissing` check), listed in a dedicated
+panel with two ways to clear it, type a real name, or click "Use
+campaign default" to explicitly accept the campaign's own signer as the
+assigned person, a conscious choice, not a silent fallback. Either path
+writes an actual value into the field and logs exactly what happened.
+This is a stricter gate than every other mandatory-review reason (tier
+mismatch, ask exceeds gift, missing title), which are cleared by a
+confirmation checkbox alone; relationship manager assignment requires an
+explicit, named answer before that checkbox is even reachable.
 
 ## Campaign messaging
 

@@ -281,6 +281,49 @@
     recompute();
   }
 
+  // A Platinum donor cannot be part of an export with a blank
+  // relationship_manager (see exportReadiness): this is the only way to
+  // clear that block, either a real name or an explicit, logged decision
+  // to use the campaign's own signer as the assigned person. Never a
+  // silent default; both paths write an actual value into the field and
+  // log exactly what happened and who chose it.
+  function assignRelationshipManager(donorId, name, isDefault) {
+    var trimmed = String(name || "").trim();
+    if (!trimmed) { toast("Enter a name, or use the campaign default button.", "warn"); return; }
+    if (!State.donors[donorId]) return;
+    State.donors[donorId].relationship_manager = trimmed;
+    var donorName = State.donors[donorId].donor_name || donorId;
+    logChange(donorId, donorName, "relationship-manager-assigned",
+      isDefault
+        ? "Assigned relationship manager: " + trimmed + " (campaign default signer, used as an explicit choice)."
+        : "Assigned relationship manager: " + trimmed + ".");
+    recomputeDonor(donorId);
+    toast("Relationship manager assigned for " + donorName + ".", "ok");
+  }
+
+  function renderRmAssignments() {
+    var el = document.getElementById("rmAssignPanel");
+    if (!el) return;
+    var ids = platinumMissingRmIds();
+    if (!ids.length) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.style.display = "block";
+    var defaultSigner = (State.config && State.config.signer_name) || "";
+    el.innerHTML = "<h3>Platinum donors needing a relationship manager: " + ids.length + "</h3>" +
+      '<p class="sub">The original assigns a personal relationship manager to every Platinum donor. ' +
+      "Export is locked until each one below has a name on file, either someone real or an explicit " +
+      "decision to use the campaign's own signer instead.</p>" +
+      ids.map(function (id) {
+        var r = State.results[id];
+        return '<div class="conflict-row">' +
+          '<div><strong>' + R.esc(r.donor_name) + '</strong> <span class="badge-empty">' + R.esc(id) + '</span></div>' +
+          '<div class="controls" style="margin-top:8px;">' +
+          '<input type="text" id="rmname_' + id + '" placeholder="Relationship manager name" style="max-width:260px;">' +
+          '<button onclick="UI.assignRelationshipManager(\'' + id + '\', document.getElementById(\'rmname_' + id + '\').value, false)">Save name</button>' +
+          (defaultSigner ? '<button class="secondary" onclick="UI.assignRelationshipManager(\'' + id + '\', ' + JSON.stringify(defaultSigner) + ', true)">Use campaign default (' + R.esc(defaultSigner) + ')</button>' : '') +
+          '</div></div>';
+      }).join("");
+  }
+
   function addManualDonor(fields) {
     var id = String(fields.donor_id || "").trim() || nextManualId();
     if (State.donors.hasOwnProperty(id)) {
@@ -392,8 +435,10 @@
     var rows = State.order.map(function (id) {
       var r = State.results[id];
       if (!r) return null;
+      var d = State.donors[id];
       return {
         donor_id: id, donor_name: r.donor_name, tier: r.tier, status: r.status,
+        relationship_manager: (d && d.relationship_manager) || "",
         ask_amount: r.ask_amount, confidence: r.confidence, review_level: r.review_level,
         confirmed: State.confirmed[id] ? "Yes" : "No", notes: r.review_reasons,
       };
@@ -404,12 +449,12 @@
     State.exceptions.forEach(function (exc) {
       rows.push({
         donor_id: exc.donor_id || "", donor_name: exc.donor_name || "",
-        tier: "", status: "", ask_amount: "", confidence: "",
+        tier: "", status: "", relationship_manager: "", ask_amount: "", confidence: "",
         review_level: "mandatory", confirmed: "No",
         notes: "failed validation: " + exc.reason,
       });
     });
-    return App.toCsv(rows, ["donor_id", "donor_name", "tier", "status", "ask_amount", "confidence", "review_level", "confirmed", "notes"]);
+    return App.toCsv(rows, ["donor_id", "donor_name", "tier", "status", "relationship_manager", "ask_amount", "confidence", "review_level", "confirmed", "notes"]);
   }
 
   function buildWorkingSetCsv() {
@@ -479,6 +524,17 @@
   // reference build enforces (its archive button stays disabled until
   // required reviews hit 0). Before that point there is nothing to
   // export yet, only work still in progress.
+  // Every Platinum donor with a blank relationship_manager, regardless of
+  // status: a lapsed Platinum donor routed to personal outreach needs a
+  // named person if anything, more than an active one does, not less.
+  function platinumMissingRmIds() {
+    return State.order.filter(function (id) {
+      var r = State.results[id];
+      var d = State.donors[id];
+      return r && r.tier === "Platinum" && !(d && String(d.relationship_manager || "").trim());
+    });
+  }
+
   function exportReadiness() {
     var total = State.order.length;
     var excCount = State.exceptions.length;
@@ -487,15 +543,16 @@
       var r = State.results[id];
       return r && (r.review_level === "mandatory" || r.review_level === "recommended") && !State.confirmed[id];
     }).length;
+    var rmMissing = platinumMissingRmIds().length;
     return {
-      total: total, excCount: excCount, conflictCount: conflictCount, needsReview: needsReview,
-      ready: total > 0 && excCount === 0 && conflictCount === 0 && needsReview === 0,
+      total: total, excCount: excCount, conflictCount: conflictCount, needsReview: needsReview, rmMissing: rmMissing,
+      ready: total > 0 && excCount === 0 && conflictCount === 0 && needsReview === 0 && rmMissing === 0,
     };
   }
 
   function jumpToWork() {
     var r = exportReadiness();
-    var selector = r.conflictCount ? '[data-tour="conflicts"]' : (r.excCount ? "#exceptionsPanel" : '[data-tour="table"]');
+    var selector = r.conflictCount ? '[data-tour="conflicts"]' : (r.excCount ? "#exceptionsPanel" : (r.rmMissing ? "#rmAssignPanel" : '[data-tour="table"]'));
     var target = document.querySelector(selector);
     if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -509,11 +566,12 @@
     if (r.total === 0) {
       msg.innerHTML = "Load donor data above to begin.";
     } else if (r.ready) {
-      msg.innerHTML = "All exceptions are resolved, all merge conflicts are settled, and every flagged donor is confirmed. Ready to export.";
+      msg.innerHTML = "All exceptions are resolved, all merge conflicts are settled, every Platinum donor has a named relationship manager, and every flagged donor is confirmed. Ready to export.";
     } else {
       var parts = [];
       if (r.excCount) parts.push(r.excCount + " data exception(s) to fix");
       if (r.conflictCount) parts.push(r.conflictCount + " merge conflict(s) to resolve");
+      if (r.rmMissing) parts.push(r.rmMissing + " Platinum donor(s) with no relationship manager assigned");
       if (r.needsReview) parts.push(r.needsReview + " flagged donor(s) awaiting confirmation");
       msg.innerHTML = "Export is locked until: " + parts.join(", ") + ". " +
         '<button class="link" type="button" onclick="UI.jumpToWork()">Take me there</button>';
@@ -590,6 +648,7 @@
     renderExceptions();
     renderTable();
     renderConflicts();
+    renderRmAssignments();
     renderTierVoice();
     renderChangeLog();
     renderSteps();
@@ -604,6 +663,7 @@
     // and still have plenty of work left in step 4, or vice versa.
     var total = State.order.length;
     var excCount = State.exceptions.length;
+    var rmMissing = platinumMissingRmIds().length;
     var mandatory = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "mandatory"; }).length;
     var recommended = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "recommended"; }).length;
     var flaggedTotal = mandatory + recommended;
@@ -616,10 +676,10 @@
     var badge3 = document.getElementById("stepBadge3");
     var badge4 = document.getElementById("stepBadge4");
     if (badge2) badge2.textContent = total ? (excCount ? excCount + " excluded" : "clean") : "";
-    if (badge3) badge3.textContent = total ? (excCount ? excCount + " to fix" : "none") : "";
+    if (badge3) badge3.textContent = total ? ((excCount || rmMissing) ? (excCount + rmMissing) + " to fix" : "none") : "";
     if (badge4) badge4.textContent = flaggedTotal ? confirmedCount + "/" + flaggedTotal : (total ? "none needed" : "");
 
-    var step3Done = total > 0 && excCount === 0;
+    var step3Done = total > 0 && excCount === 0 && rmMissing === 0;
     var step4Done = total > 0 && needsReview === 0;
     var states = [
       total > 0 ? "done" : "active",                              // 1 data loaded
@@ -856,6 +916,56 @@
     document.getElementById("cfg_match_confirmed").checked = !!c.match_confirmed;
   }
 
+  // A settings change is invisible until someone opens the table and
+  // starts comparing rows by eye. This snapshots what actually moved
+  // (who's lapsed, who needs mandatory review, whose ask changed) so the
+  // consequence of a setting shows up as a plain-language summary right
+  // where the setting was changed, the same "next step is a gate check"
+  // pattern the walkthrough uses for every other kind of change.
+  function snapshotAggregates() {
+    var lapsed = 0, mandatory = 0;
+    var askById = {};
+    State.order.forEach(function (id) {
+      var r = State.results[id];
+      if (!r) return;
+      if (r.status === "lapsed") lapsed += 1;
+      if (r.review_level === "mandatory") mandatory += 1;
+      askById[id] = r.ask_amount || "";
+    });
+    return { lapsed: lapsed, mandatory: mandatory, askById: askById, campaignType: State.config && State.config.campaign_type };
+  }
+
+  function diffAggregates(before, after) {
+    var lines = [];
+    if (before.lapsed !== after.lapsed) {
+      lines.push((after.lapsed > before.lapsed ? "+" : "") + (after.lapsed - before.lapsed) + " donor(s) now counted as lapsed (" + before.lapsed + " &rarr; " + after.lapsed + ")");
+    }
+    if (before.mandatory !== after.mandatory) {
+      lines.push((after.mandatory > before.mandatory ? "+" : "") + (after.mandatory - before.mandatory) + " donor(s) now need mandatory review (" + before.mandatory + " &rarr; " + after.mandatory + ")");
+    }
+    var askChanged = 0;
+    Object.keys(after.askById).forEach(function (id) {
+      if (before.askById.hasOwnProperty(id) && before.askById[id] !== after.askById[id]) askChanged += 1;
+    });
+    if (askChanged) lines.push(askChanged + " donor(s)' ask amount recalculated to a different number");
+    if (before.campaignType !== after.campaignType) {
+      lines.push("campaign type changed from " + R.esc(before.campaignType || "(none)") + " to " + R.esc(after.campaignType || "(none)") + ": every letter's messaging paragraph now follows different rules (see the tier-voice panel above)");
+    }
+    return lines;
+  }
+
+  function renderConfigImpact(lines) {
+    var el = document.getElementById("configImpactNote");
+    if (!el) return;
+    if (!lines.length) {
+      el.className = "impact-note neutral";
+      el.innerHTML = "Applied. No visible change to lapsed status, mandatory review, ask amounts, or campaign type.";
+      return;
+    }
+    el.className = "impact-note";
+    el.innerHTML = "<strong>This changed the produced result:</strong><ul>" + lines.map(function (l) { return "<li>" + l + "</li>"; }).join("") + "</ul>";
+  }
+
   function applyConfigForm() {
     var c = {};
     ["campaign_type", "as_of_date", "charity_name", "donation_url", "signer_name", "signer_title", "match_sponsor", "match_terms", "reengagement_gift"].forEach(function (f) {
@@ -876,10 +986,13 @@
       return;
     }
     var changedFields = Object.keys(c).filter(function (f) { return String(State.config[f]) !== String(c[f]); });
+    var before = snapshotAggregates();
     State.config = c;
     logChange("", "", "campaign-settings", "Campaign settings changed (" + (changedFields.join(", ") || "no visible change") + "). All confirmations reset.");
     invalidateAllConfirmations("Campaign settings changed. All confirmations reset; every flagged donor needs review again.");
     recompute();
+    var after = snapshotAggregates();
+    renderConfigImpact(diffAggregates(before, after));
     toast("Campaign settings applied.", "ok");
   }
 
@@ -1004,15 +1117,93 @@
       "<br>Try reloading the page. If it keeps happening, open the browser console (F12) and share what it shows.";
   }
 
-  // ---- guided tour: highlight and scroll to each major section in turn.
-  // No audio (Bryan is recording his own narration); this is just
-  // navigation and a caption per step.
+  // ---- guided walkthrough ----
+  // Not a passive tour: each step is a real decision point (a setting to
+  // check, an input to set) in the order a person would actually make
+  // them, with why it matters tied back to a specific finding in
+  // ASSESSMENT.md and what changing it actually does to the produced
+  // result. Written to double as Bryan's own narration script when
+  // recording a walkthrough video, one step, one talking point, in
+  // order. No audio built into the page itself; that's recorded
+  // separately over this.
   var TOUR_STEPS = [
-    { sel: '[data-tour="findings"]', text: "Every number here is the real output of validating the loaded data live, right now, in this browser. This panel names the exact donors whose tier label didn't match their own giving, and any major donor who's lapsed." },
-    { sel: '[data-tour="settings"]', text: "Campaign settings. Changing any of these recomputes every donor and clears every confirmation, since the ask amount and letter wording both depend on these values." },
-    { sel: '[data-tour="donordata"]', text: "Replace the whole list, merge in more from a second file, or add one donor by hand. Nothing here touches a server; it's all read and processed in this tab." },
-    { sel: '[data-tour="table"]', text: "The donor table. Click any column header to sort. Edit a donor and watch tier, ask, and letter recompute immediately, with a plain-language summary of exactly what changed." },
-    { sel: '[data-tour="export"]', text: "When you're done, export everything as one zip: the manifest, the full modified dataset, the change log, and every confirmed letter as its own file." },
+    {
+      sel: null,
+      title: "Welcome: this page is the program",
+      text: "Every rule this build implements (see ASSESSMENT.md) runs as deterministic code right here in your browser, not a language model. Nothing on this page was generated by an AI reading your data; a model never touches tier, ask amount, or arithmetic. This walkthrough goes through every input that changes what gets produced, in the order you'd actually decide them, so you can see the effect of each choice before it reaches a real donor.",
+      why: "The original skill asked a model to read a table, compute tiers, do arithmetic, and write letters, all in one pass, with no way to check any single step. Splitting it into inputs you set once (this walkthrough) and math the code gets right the same way every time (everything downstream) is the entire fix.",
+      prompt: "Click Next to start with who this campaign is from.",
+    },
+    {
+      sel: '[data-tour="settings"]',
+      title: "Step 1: who is this campaign from?",
+      text: "Charity name, donation URL, and the signer's name and title appear in every letter, for every donor, regardless of tier. Check the values below and edit any of them if this isn't your organization's real information.",
+      why: "references/policy.md is explicit that these are required: &ldquo;the real person who signs every letter, regardless of tier. Never invented.&rdquo; The original's template just assumed a name would appear there; it never said where that name comes from.",
+      prompt: "Review these, then Next for the date, which affects something less obvious.",
+    },
+    {
+      sel: '[data-tour="settings"]',
+      title: "Step 2: what date is &ldquo;today&rdquo; for this run?",
+      text: "The As-of date is the reference point for every date calculation: whether a donor counts as lapsed (no gift in over 3 years) and whether they get the 10% loyalty uplift for giving last year. It is deliberately not your computer's actual clock, a donor file has its own internal timeline.",
+      why: "Try it: move the as-of date forward a couple of years and click Apply. The impact note under the settings panel will tell you exactly how many donors flipped to lapsed and how many ask amounts changed, before you've looked at a single row.",
+      prompt: "This is the first step where changing an input visibly changes the result. Try it, then come back to Next.",
+    },
+    {
+      sel: '[data-tour="settings"]',
+      title: "Step 3: what kind of campaign is this?",
+      text: "Campaign type is the single biggest lever on what every letter says. Annual fund mentions a giving streak. Emergency appeal uses urgency language and only mentions a match if you've checked &ldquo;Match confirmed&rdquo; and filled in a real sponsor and terms below. Capital campaign uses legacy/permanence framing. Event fundraiser mentions a registration count if you enter one. There's no &ldquo;close enough&rdquo; default; an unrecognized value stops the run rather than silently defaulting.",
+      why: "The original skill's Emergency Appeal instruction said to tell the donor their gift &ldquo;will be matched, even if no match is confirmed, we can sort that out later.&rdquo; That's a false claim about a donor's own money. This build only ever mentions a match if you've explicitly confirmed one, here, with a real sponsor and real terms.",
+      prompt: "Pick your real campaign type and Apply if you change it. Watch the impact note again.",
+    },
+    {
+      sel: '[data-tour="donordata"]',
+      title: "Step 4: whose data is this?",
+      text: "The page opens with the case study's own 50-donor sample file already loaded. For a real run: &ldquo;Replace working set with a new file&rdquo; starts over from your own export; &ldquo;Merge in additional donors&rdquo; adds a second file to what's already loaded. A donor ID that already exists is never silently overwritten, it's held for you to resolve field by field.",
+      why: "The original skill hardcoded a donor table directly into its own instructions. That can't grow with a donor list without editing the skill itself every time. This build's skill holds no donor data of its own; the file you load here is the only source of truth.",
+      prompt: "Load your own file now if you have one, or keep exploring with the sample data.",
+    },
+    {
+      sel: '[data-tour="findings"]',
+      title: "What the data already told us",
+      text: "Computed live from whatever's currently loaded, not written for the sample data specifically. It names every donor whose stated tier disagreed with what their own giving history computes to, and every major donor (Gold or Platinum) who hasn't given in over 3 years.",
+      why: "The original skill said to trust the file's stated Tier column. A donor whose actual giving computes to Gold but is labeled Platinum in the source system, or the reverse, is exactly the kind of error a person reviewing rows by eye is likely to miss; this panel names it outright instead.",
+      prompt: null,
+    },
+    {
+      sel: '[data-tour="table"]',
+      title: "Every donor, recomputed live",
+      text: "Click any column header to sort, including the new Donor ID column (useful for matching up with the exported letters/ folder, now named donor-ID-first). Edit a donor and everything downstream, tier, ask, salutation, letter, recomputes immediately with a plain-language summary of what changed.",
+      why: null,
+      prompt: "Try editing one donor's gift history and watch the tier and ask amount update before you close the panel.",
+    },
+    {
+      sel: '[data-tour="rmassign"]',
+      title: "Platinum gets extra requirements",
+      text: "Two things apply only to Platinum donors: a very formal tone with a naming-opportunity mention (automatic), and a personal relationship manager, a real named person who signs their letter instead of the generic campaign signer. Any Platinum donor still missing one is listed here: type a name and Save, or click &ldquo;Use campaign default&rdquo; to consciously accept the campaign's own signer instead of leaving it blank.",
+      why: "The original said to &ldquo;assign a personal relationship manager name&rdquo; for Platinum donors but never said where that name comes from. Nothing here is ever invented: export is locked until every Platinum donor has an explicit answer, a name or a deliberate default, and either way it's written to the change log and the manifest.",
+      prompt: null,
+    },
+    {
+      sel: '[data-tour="table"]',
+      title: "Salutation and tone, by tier",
+      text: "Platinum and Gold get &ldquo;Dear [Title] [Last Name],&rdquo; if a title is on file, or their full name if it isn't, never a guessed honorific. Silver and Bronze get &ldquo;Hi [First Name],&rdquo;. A lapsed donor gets &ldquo;We've missed you, [First Name]!&rdquo; regardless of their financial tier. A missing title on a Platinum or Gold donor is flagged for mandatory review, the same as a missing relationship manager, so the fallback is something a person signs off on.",
+      why: "The original guessed a title from a first name &ldquo;if it seems obvious&rdquo; (its own example: &ldquo;Elizabeth is probably Ms.&rdquo;). Guessing gender from a name is the one part of the original's salutation instructions this build actually changes rather than implements; the tiered format itself is implemented exactly as written.",
+      prompt: null,
+    },
+    {
+      sel: '[data-tour="steps"]',
+      title: "The gate: nothing exports until it's actually ready",
+      text: "Five steps track a batch from load to export. Step 3 clears when every data exception and every Platinum relationship-manager assignment is resolved. Step 4 clears when every flagged donor has been explicitly confirmed, one checkbox per donor (or a bulk button that names every donor it's about to mark before doing anything). Step 5 only unlocks once both are done.",
+      why: "&ldquo;Make reasonable assumptions and proceed&rdquo; is the opposite of this. A missing or ambiguous field routes to a human, every time, instead of shipping a guess under the organization's name.",
+      prompt: null,
+    },
+    {
+      sel: '[data-tour="export"]',
+      title: "One zip, everything in it",
+      text: "Once unlocked: the review manifest, the full modified donor data, the change log, one HTML file per donor with no exceptions (a real letter where possible, otherwise an internal review notice explaining why and who it's assigned to), SKILL.md, ASSESSMENT.md, and a working copy of this exact page.",
+      why: "This is the same package a fundraiser gets and the same one this case study is submitted with; there is no separate version.",
+      prompt: "That's the whole walkthrough. End it whenever you're ready, or Back to revisit a step.",
+    },
   ];
   var tourIndex = -1;
   function startTour() {
@@ -1028,16 +1219,23 @@
   function showTourStep() {
     document.querySelectorAll(".spotlight").forEach(function (el) { el.classList.remove("spotlight"); });
     var step = TOUR_STEPS[tourIndex];
-    var el = document.querySelector(step.sel);
+    var el = step.sel ? document.querySelector(step.sel) : null;
     if (el) { el.classList.add("spotlight"); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
-    document.getElementById("tourCaption").textContent = "(" + (tourIndex + 1) + "/" + TOUR_STEPS.length + ") " + step.text;
+    var html = '<span class="tour-step-label">Step ' + (tourIndex + 1) + " of " + TOUR_STEPS.length + '</span>' +
+      '<span class="tour-title">' + step.title + '</span>' +
+      '<span class="tour-text">' + step.text + '</span>';
+    if (step.why) html += '<span class="tour-why"><strong>Why this matters:</strong> ' + step.why + '</span>';
+    if (step.prompt) html += '<span class="tour-prompt">' + step.prompt + '</span>';
+    document.getElementById("tourCaption").innerHTML = html;
+    document.getElementById("tourNext").style.display = tourIndex === TOUR_STEPS.length - 1 ? "none" : "";
+    document.getElementById("tourBack").style.display = tourIndex === 0 ? "none" : "";
   }
   function endTour() {
     document.querySelectorAll(".spotlight").forEach(function (el) { el.classList.remove("spotlight"); });
     tourIndex = -1;
     document.getElementById("tourStart").style.display = "";
     ["tourNext", "tourBack", "tourEnd"].forEach(function (id) { document.getElementById(id).style.display = "none"; });
-    document.getElementById("tourCaption").textContent = "A short, guided tour of what this page actually does, if you want it.";
+    document.getElementById("tourCaption").textContent = "A guided walkthrough of what this page does, why it's built this way, and what to check before you run it with real data, if you want it.";
   }
 
   window.UI = {
@@ -1048,6 +1246,7 @@
     handleFileUpload: handleFileUpload,
     handleSessionUpload: handleSessionUpload,
     resolveConflict: resolveConflict,
+    assignRelationshipManager: assignRelationshipManager,
     addManualDonor: addManualDonor,
     editDonorField: editDonorField,
     removeDonor: removeDonor,

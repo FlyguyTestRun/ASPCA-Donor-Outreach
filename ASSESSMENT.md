@@ -735,3 +735,46 @@ placeholder filled from `build_letter_model`/`buildLetterModel`. No
 placeholder is ever left unfilled or filled with invented text;
 `validate_letter_model` rejects a letter model before rendering if any
 required field is missing or empty.
+
+## Part 10: Closing the gap between "flagged" and "actually assigned"
+
+A later pass found that "mandatory review" and "a person actually made
+this decision" were not the same thing for the Platinum relationship
+manager requirement. A Platinum donor with no name on file was flagged
+mandatory, same as a tier mismatch or an ask that exceeds a donor's
+largest gift, and cleared by the same single confirmation checkbox
+every other mandatory reason uses. Nothing stopped someone from
+confirming through without ever actually naming anyone, shipping a
+letter signed by the campaign's generic signer under the label of a
+requirement that was supposed to guarantee a real, named person.
+
+*Fix, in the interactive tool specifically* (the batch pipeline still
+generates with a visible default and a flagged manifest row, since it
+runs unattended with no person to make this call): a dedicated panel
+lists every Platinum donor still missing one, and export is locked
+until each is resolved, not just flagged. Resolving it means typing a
+real name, or explicitly clicking "use the campaign default," a
+conscious choice that writes an actual value into the field rather than
+leaving it implicitly blank. Both paths are written to `manifest.csv`
+(a new `relationship_manager` column, so the spreadsheet answers "who
+is this" without cross-referencing notes text) and to the change log by
+name, not folded into a generic "field changed" entry. This is a
+stricter gate than every other mandatory-review reason on purpose: an
+assigned person is the entire content of what the original asked for
+here, not a side effect of a data-quality check.
+
+**The guided walkthrough became a setup wizard, not just a tour.** The
+original five-step tour pointed at sections and described them in one
+line each. It now walks through every input that changes the produced
+result, in the order a person would actually decide them (who signs,
+what date, what campaign type, whose data), explains why each one
+matters with a direct line back to a specific finding in this document,
+and for the two inputs with the widest blast radius (the as-of date and
+campaign type) prompts the reader to actually change the value and
+watch a live impact summary report exactly what shifted, lapsed counts,
+mandatory-review counts, ask amounts, before they commit to a batch.
+That impact summary (`ui.js`, `snapshotAggregates`/`diffAggregates`,
+shown under the campaign settings panel every time settings are
+applied) did not exist before this pass; a setting change recomputed
+everything silently and left a person to notice the difference by
+comparing table rows themselves.

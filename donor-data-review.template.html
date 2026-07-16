@@ -84,9 +84,17 @@ a { color: var(--accent); }
 code { background:var(--accent-soft); padding:1px 5px; border-radius:5px; font-size:.88em; }
 details summary { cursor:pointer; font-weight:600; }
 .privacy-note { font-size: .82rem; color: var(--muted); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 14px; }
-.tour-nav { position:sticky; top:10px; z-index:30; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.impact-note { font-size: .84rem; margin-top: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--warn); background: var(--warn-soft); color: var(--warn); }
+.impact-note.neutral { border-color: var(--line); background: var(--bg); color: var(--muted); }
+.impact-note ul { margin: 4px 0 0; padding-left: 18px; }
+.tour-nav { position:sticky; top:10px; z-index:30; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.tour-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
 .tour-nav button { padding:6px 12px; font-size:.82rem; }
-.tour-caption { flex:1; min-width:180px; font-size:.84rem; color:var(--muted); }
+.tour-caption { font-size:.86rem; color:var(--muted); line-height:1.55; }
+.tour-caption .tour-step-label { display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); font-weight:700; margin-bottom:4px; }
+.tour-caption .tour-title { display:block; font-size:1.02rem; font-weight:700; color:var(--ink); margin-bottom:6px; }
+.tour-caption .tour-why { display:block; margin-top:8px; padding:9px 12px; background:var(--accent-soft); border-radius:8px; font-size:.83rem; }
+.tour-caption .tour-prompt { display:block; margin-top:8px; font-style:italic; }
 .spotlight { outline:3px solid var(--accent); outline-offset:4px; border-radius:10px; transition:outline-color .2s; scroll-margin-top:80px; }
 .progress-track { height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:10px 0 4px; }
 .progress-fill { height:100%; background:var(--accent); width:0%; transition:width .3s; }
@@ -121,7 +129,7 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
 
 <div id="pageError"></div>
 
-<div class="steps" id="stepsTracker">
+<div class="steps" id="stepsTracker" data-tour="steps">
   <div class="step" data-jump="donordata"><span class="step-num">1</span>Data loaded</div>
   <div class="step" data-jump="findings"><span class="step-num">2</span>Validated<span class="step-badge" id="stepBadge2"></span></div>
   <div class="step" data-jump="table"><span class="step-num">3</span>Review &amp; correct<span class="step-badge" id="stepBadge3"></span></div>
@@ -130,11 +138,13 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
 </div>
 
 <div class="tour-nav" id="tourNav">
-  <button class="secondary" onclick="UI.startTour()" id="tourStart">Start guided tour</button>
-  <button onclick="UI.tourStep(1)" style="display:none;" id="tourNext">Next</button>
-  <button class="secondary" onclick="UI.tourStep(-1)" style="display:none;" id="tourBack">Back</button>
-  <span class="tour-caption" id="tourCaption">A short, guided tour of what this page actually does, if you want it.</span>
-  <button class="secondary" onclick="UI.endTour()" style="display:none;" id="tourEnd">End tour</button>
+  <div class="tour-controls">
+    <button class="secondary" onclick="UI.startTour()" id="tourStart">Start guided walkthrough</button>
+    <button onclick="UI.tourStep(1)" style="display:none;" id="tourNext">Next</button>
+    <button class="secondary" onclick="UI.tourStep(-1)" style="display:none;" id="tourBack">Back</button>
+    <button class="secondary" onclick="UI.endTour()" style="display:none;" id="tourEnd">End walkthrough</button>
+  </div>
+  <div class="tour-caption" id="tourCaption">A guided walkthrough of what this page does, why it's built this way, and what to check before you run it with real data, if you want it.</div>
 </div>
 
 <div class="panel ready-banner" id="readyBanner">Loading...</div>
@@ -171,6 +181,7 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
   </div>
   <div class="btnrow"><button onclick="UI.applyConfigForm()">Apply settings</button></div>
   <p class="badge-empty">Changing any setting here recomputes every donor and resets all confirmations, since the ask amount and letter text depend on these values.</p>
+  <div id="configImpactNote"></div>
 </div>
 
 <h2>Donor data</h2>
@@ -207,6 +218,7 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
 
 <div id="conflictPanel" class="panel" style="display:none;" data-tour="conflicts"></div>
 <div id="exceptionsPanel" class="panel" style="display:none;"></div>
+<div id="rmAssignPanel" class="panel" style="display:none;" data-tour="rmassign"></div>
 
 <h2>Donors</h2>
 <div class="controls" data-tour="table">

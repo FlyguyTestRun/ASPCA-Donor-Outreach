@@ -359,6 +359,7 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
             manifest_rows.append({
                 "donor_id": donor["donor_id"], "donor_name": donor["donor_name"],
                 "tier": donor["tier"], "status": donor["status"],
+                "relationship_manager": donor.get("relationship_manager", ""),
                 "ask_amount": "", "confidence": donor["confidence"],
                 "review_level": donor["review_level"], "letter_file": f"letters/{letter_file}",
                 "notes": reason, "rules_version": donor.get("rules_version", rules.RULES_VERSION),
@@ -376,6 +377,7 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
             manifest_rows.append({
                 "donor_id": donor["donor_id"], "donor_name": donor["donor_name"],
                 "tier": donor["tier"], "status": donor["status"],
+                "relationship_manager": donor.get("relationship_manager", ""),
                 "ask_amount": donor["ask_amount"], "confidence": donor["confidence"],
                 "review_level": "mandatory", "letter_file": f"letters/{letter_file}",
                 "notes": reason,
@@ -390,6 +392,7 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
         manifest_rows.append({
             "donor_id": donor["donor_id"], "donor_name": donor["donor_name"],
             "tier": donor["tier"], "status": donor["status"],
+            "relationship_manager": donor.get("relationship_manager", ""),
             "ask_amount": donor["ask_amount"], "confidence": donor["confidence"],
             "review_level": donor["review_level"], "letter_file": f"letters/{letter_file}",
             "notes": donor["review_reasons"],
@@ -417,7 +420,7 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
             placeholders += 1
             manifest_rows.append({
                 "donor_id": donor_id, "donor_name": donor_name,
-                "tier": "", "status": "", "ask_amount": "", "confidence": "",
+                "tier": "", "status": "", "relationship_manager": "", "ask_amount": "", "confidence": "",
                 "review_level": "mandatory", "letter_file": f"letters/{letter_file}",
                 "notes": reason, "rules_version": rules.RULES_VERSION,
             })
