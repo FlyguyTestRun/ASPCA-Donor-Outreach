@@ -645,6 +645,8 @@
   function renderAll() {
     renderSummary();
     renderFindings();
+    renderDonorComparison();
+    renderPipelineAnnotations();
     renderExceptions();
     renderTable();
     renderConflicts();
@@ -742,6 +744,136 @@
         lapsedMajor.map(function (t) { return "<li>" + R.esc(t) + "</li>"; }).join("") + "</ul>";
     }
     el.innerHTML = html;
+  }
+
+  // ---- "same donor, two approaches" (illustrative only) ----
+  // A deliberately separate, parallel implementation of the ORIGINAL
+  // skill's literal instructions: trusts the stated tier as-is, and
+  // follows the original's literal step order (round to the nearest $50
+  // immediately after the tier percentage, before any uplift, with no
+  // rounding at the end). This never shares code with the real pipeline
+  // (donor_rules.js / app.js) on purpose, so a bug here can never touch
+  // a real letter. It exists only to make the difference between "no
+  // verification" and "this pipeline" visible and honest, computed live
+  // from whatever donor is actually flagged in the current data, not a
+  // hardcoded example that could go stale.
+  function computeNaiveAskLiteral(rawDonor, computedDonor, config) {
+    var statedTier = String((rawDonor && rawDonor.tier) || "").trim();
+    var largest = parseFloat(computedDonor.largest_gift);
+    var lastGiftYear = parseInt(computedDonor.last_gift_year, 10);
+    var asOfYear = R.asOfYear(config);
+    var volunteer = computedDonor.volunteer === "Yes";
+    var trace = [];
+    var amount;
+
+    trace.push('Look up the stated tier in the file: "' + (statedTier || "(blank)") + '" (never checked against the donor\'s own giving history)');
+
+    if (R.PERCENT_ASK.hasOwnProperty(statedTier)) {
+      var pct = R.PERCENT_ASK[statedTier];
+      amount = largest * pct;
+      trace.push(statedTier + " asks for " + Math.round(pct * 100) + "% of the largest single gift: $" + R.fmtMoney0(largest) + " × " + pct + " = $" + amount.toFixed(2));
+    } else if (statedTier === "Lapsed") {
+      amount = R.FLAT_ASK_LAPSED;
+      trace.push("Lapsed tier: flat $" + R.FLAT_ASK_LAPSED);
+    } else {
+      amount = R.FLAT_ASK_BRONZE;
+      trace.push((statedTier === "Bronze" ? "Bronze tier" : "Unrecognized tier, defaulted to Bronze") + ": flat $" + R.FLAT_ASK_BRONZE);
+    }
+
+    amount = R.roundHalfUp(amount);
+    trace.push("Round to the nearest $50 here, before any uplift below (the instructions' own step order): $" + R.fmtMoney0(amount));
+
+    if (lastGiftYear === asOfYear - 1) {
+      amount = amount * 1.10;
+      trace.push("Gave last year: × 1.10 loyalty uplift = $" + amount.toFixed(2));
+    }
+    if (volunteer) {
+      amount = amount + 100;
+      trace.push("Also a volunteer: + $100 flat = $" + amount.toFixed(2));
+    }
+    if (config.campaign_type === "emergency_appeal") {
+      amount = amount * 1.2;
+      trace.push("Emergency appeal: × 1.2 = $" + amount.toFixed(2));
+    }
+    var finalAmount = Math.round(amount);
+    trace.push("Nothing rounds it again. Output that number as the ask amount: $" + R.fmtMoney0(finalAmount));
+
+    return { amount: finalAmount, trace: trace, statedTier: statedTier || "(blank)" };
+  }
+
+  function findComparisonDonor() {
+    return State.order.find(function (id) {
+      var r = State.results[id];
+      return r && (r.mandatory_reasons || "").indexOf("tier corrected") !== -1;
+    });
+  }
+
+  function renderDonorComparison() {
+    var el = document.getElementById("donorComparisonPanel");
+    if (!el) return;
+    var id = findComparisonDonor();
+    if (!id) {
+      el.innerHTML = "<h3>Same donor, two approaches</h3><p class=\"badge-empty\">No tier-label mismatch in the current data to compare. " +
+        "This section appears automatically the moment one exists, edit a donor's tier away from what their gift history computes, " +
+        "or load data with one, and the comparison below fills in for that real donor.</p>";
+      return;
+    }
+    var raw = State.donors[id];
+    var computed = State.results[id];
+    var naive = computeNaiveAskLiteral(raw, computed, State.config);
+    var realTraceLines = (computed.ask_trace || "").split(" -> ").filter(Boolean);
+    var realFinal = computed.ask_amount ? Number(computed.ask_amount) : null;
+
+    el.innerHTML =
+      "<h3>Same donor, two approaches</h3>" +
+      "<p class=\"sub\">The clearest way to answer \"how are the outputs actually different\": one real donor from the " +
+      "current data, run through what the original instructions literally say to do, and through what this pipeline " +
+      "actually does. Neither number is hypothetical; both are the real formula, applied to " + R.esc(computed.donor_name) +
+      "'s real gift history (donor ID " + R.esc(id) + ").</p>" +
+      "<div class=\"donor-compare\">" +
+        "<div class=\"donor-compare-col bad\">" +
+          "<div class=\"donor-compare-label\">Original instructions, followed literally</div>" +
+          "<ol>" + naive.trace.map(function (line) { return "<li>" + R.esc(line) + "</li>"; }).join("") + "</ol>" +
+          "<div class=\"donor-compare-amount\">$" + R.fmtMoney0(naive.amount) + "</div>" +
+          "<div class=\"donor-compare-caption\">what a model following these instructions, on this donor, would ask for</div>" +
+        "</div>" +
+        "<div class=\"donor-compare-col ok\">" +
+          "<div class=\"donor-compare-label\">This pipeline, run on the same donor</div>" +
+          "<ol>" + realTraceLines.map(function (line) { return "<li>" + R.esc(line) + "</li>"; }).join("") + "</ol>" +
+          "<div class=\"donor-compare-amount\">" + (realFinal !== null ? "$" + R.fmtMoney0(realFinal) : "held for review, no ask yet") + "</div>" +
+          "<div class=\"donor-compare-caption\">the ask this pipeline computes, and the only one it ever sends</div>" +
+        "</div>" +
+      "</div>";
+  }
+
+  function renderPipelineAnnotations() {
+    var total = State.order.length;
+    var excCount = State.exceptions.length;
+    var tierMismatches = State.order.filter(function (id) {
+      var r = State.results[id];
+      return r && (r.mandatory_reasons || "").indexOf("tier corrected") !== -1;
+    }).length;
+    var mandatory = State.order.filter(function (id) {
+      var r = State.results[id];
+      return r && r.review_level === "mandatory";
+    }).length;
+    var placeholders = State.order.filter(function (id) {
+      return State.results[id] && State.results[id].is_placeholder;
+    }).length;
+
+    var setText = function (id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    if (!total) {
+      setText("pipelineAnnotValidate", "Waiting for donor data to load");
+      setText("pipelineAnnotGenerate", "");
+      setText("pipelineAnnotReview", "");
+      return;
+    }
+    setText("pipelineAnnotValidate", tierMismatches + " tier mismatch(es) caught here" + (excCount ? ", " + excCount + " exception(s) held" : "") + " on this data");
+    setText("pipelineAnnotGenerate", "Every donor gets a file: " + total + " of " + total + (placeholders ? " (" + placeholders + " placeholder review notice(s))" : ""));
+    setText("pipelineAnnotReview", mandatory + " of " + total + " donors held for a person on this run");
   }
 
   function renderTierVoice() {
@@ -1135,6 +1267,13 @@
       prompt: "Click Next to start with who this campaign is from.",
     },
     {
+      sel: '[data-tour="pipeline-diagram"]',
+      title: "The five stages, and where each planted problem gets caught",
+      text: "Five checkpoints, in order: validate (recompute, never trust), calculate (deterministic math, one rounding step), generate (schema-checked before it becomes HTML), human review (the one stage where a person, not code, decides), and export (locked until everything above actually clears). Every stage names the real script that runs it and updates live with the current data's actual numbers, not a fixed example.",
+      why: "This is the direct answer to \"why does this look different from a single prompt\": each box below is a place the original's all-in-one design had no way to check its own work, and now does.",
+      prompt: null,
+    },
+    {
       sel: '[data-tour="settings"]',
       title: "Step 1: who is this campaign from?",
       text: "Charity name, donation URL, and the signer's name and title appear in every letter, for every donor, regardless of tier. Check the values below and edit any of them if this isn't your organization's real information.",
@@ -1167,6 +1306,13 @@
       title: "What the data already told us",
       text: "Computed live from whatever's currently loaded, not written for the sample data specifically. It names every donor whose stated tier disagreed with what their own giving history computes to, and every major donor (Gold or Platinum) who hasn't given in over 3 years.",
       why: "The original skill said to trust the file's stated Tier column. A donor whose actual giving computes to Gold but is labeled Platinum in the source system, or the reverse, is exactly the kind of error a person reviewing rows by eye is likely to miss; this panel names it outright instead.",
+      prompt: null,
+    },
+    {
+      sel: '[data-tour="comparison"]',
+      title: "One real donor, computed two ways",
+      text: "This section takes the first donor above with a tier mismatch and computes their ask amount twice: once by literally following the original's instructions (trusting the stated tier, rounding immediately after the tier percentage, per its own step order), and once by this pipeline's actual math. Both traces are real, computed live from that donor's real gift history, not written out by hand.",
+      why: "Numbers make this concrete in a way \"the original trusts a bad label\" doesn't: this is the actual dollar difference between an unverified read of the file and a verified one, for a real person on this list.",
       prompt: null,
     },
     {

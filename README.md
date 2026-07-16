@@ -66,40 +66,7 @@ implementations over the same 50-donor fixture and diffs every field; if
 they ever disagree, that test fails and names exactly which donor and
 field.
 
-```mermaid
-flowchart LR
-    DF["Donor file\nCSV or XLSX"]
-    CC["Campaign config\nJSON"]
-
-    subgraph POLICY["references/policy.md: single source of truth"]
-        RULES["Tiers · ask formula · salutation\nvoice by tier · review gates"]
-    end
-
-    DF --> V1
-    DF --> V2
-    CC --> V1
-    CC --> V2
-
-    subgraph PY["Python batch path: any donor count"]
-        direction TB
-        V1["validate_input.py"] --> C1["calculate_ask.py"] --> G1["generate_letters.py"]
-        G1 --> L1["output/letters/*.html"]
-        G1 --> M1["output/manifest.csv"]
-    end
-
-    subgraph JS["Browser path: hands-on review, donor-data-review.html"]
-        direction TB
-        V2["app.js\nvalidateRow"] --> C2["app.js\ncalculateAsk"] --> G2["app.js\ngenerateForDonor"]
-        G2 --> UITBL["ui.js\ntable · findings · edit · merge · confirm"]
-        UITBL --> GATE{"Export gate\nexceptions = 0\nconflicts = 0\nunconfirmed = 0"}
-        GATE -- locked --> UITBL
-        GATE -- unlocked --> ZIP["1 zip:\nletters + data + SKILL.md +\nASSESSMENT.md + self-copy"]
-    end
-
-    RULES -.implements.-> V1
-    RULES -.implements.-> V2
-    L1 -. "test_js_full_parity.js\ndiffs every field, every donor" .-> G2
-```
+![Pipeline diagram: donor file and campaign config feed a five-stage pipeline, validate, calculate, generate, human review, export, with a dashed loop returning held records for correction, and a legend marking the one human-decision stage](docs/pipeline-diagram.svg)
 
 ## What actually happens when you run it
 

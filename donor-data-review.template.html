@@ -113,6 +113,28 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
 .step .step-badge { display:block; font-size:.72rem; color:var(--muted); margin-top:2px; }
 @media (max-width: 760px) { .steps { flex-direction:column; } .step { border-right:none; border-bottom:1px solid var(--line); } }
 #pageError { display:none; background:var(--bad-soft); border:1px solid var(--bad); color:var(--bad); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:.9rem; }
+.pipeline-stages { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-top:14px; }
+.pipeline-stage { flex:1; min-width:170px; background:var(--bg); border:2px solid var(--accent); border-radius:10px; padding:12px 14px; }
+.pipeline-stage.human { border-color:var(--bad); }
+.pipeline-stage-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; background:var(--accent); color:#fff; font-weight:700; font-size:.76rem; margin-bottom:6px; }
+.pipeline-stage.human .pipeline-stage-num { background:var(--bad); }
+.pipeline-stage-title { font-weight:700; font-size:.92rem; margin-bottom:4px; }
+.pipeline-stage-script { font-family:var(--mono); font-size:.7rem; color:var(--accent); margin-bottom:6px; }
+.pipeline-stage-desc { font-size:.78rem; color:var(--muted); margin-bottom:8px; line-height:1.45; }
+.pipeline-stage-annot { font-size:.76rem; font-weight:700; color:var(--bad); }
+.pipeline-arrow { display:flex; align-items:center; justify-content:center; padding:0 6px; color:var(--muted); font-size:1.2rem; flex:0 0 auto; }
+@media (max-width: 900px) { .pipeline-stages { flex-direction:column; } .pipeline-arrow { transform:rotate(90deg); padding:4px 0; } }
+.donor-compare { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:14px 0; }
+@media (max-width: 760px) { .donor-compare { grid-template-columns:1fr; } }
+.donor-compare-col { border-radius:12px; padding:16px 18px; background:var(--panel); border:1px solid var(--line); border-top:4px solid var(--line); }
+.donor-compare-col.bad { border-top-color:var(--bad); }
+.donor-compare-col.ok { border-top-color:var(--accent); }
+.donor-compare-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700; margin-bottom:10px; }
+.donor-compare-col ol { margin:0 0 12px; padding-left:20px; font-size:.83rem; line-height:1.6; }
+.donor-compare-amount { font-size:1.8rem; font-weight:700; }
+.donor-compare-col.bad .donor-compare-amount { color:var(--bad); }
+.donor-compare-col.ok .donor-compare-amount { color:var(--accent); }
+.donor-compare-caption { font-size:.78rem; color:var(--muted); margin-top:4px; }
 </style>
 </head>
 <body>
@@ -147,11 +169,61 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
   <div class="tour-caption" id="tourCaption">A guided walkthrough of what this page does, why it's built this way, and what to check before you run it with real data, if you want it.</div>
 </div>
 
+<h2>Why the pipeline is shaped this way</h2>
+<div class="panel" data-tour="pipeline-diagram">
+  <p class="sub">The original skill asked a language model to hold the donor list, do the
+  arithmetic, and write the letter, all in one step, on faith. This puts a checkpoint at
+  every place that step could go wrong, before a model ever touches the data.</p>
+  <div class="pipeline-stages">
+    <div class="pipeline-stage">
+      <div class="pipeline-stage-num">1</div>
+      <div class="pipeline-stage-title">Validate</div>
+      <div class="pipeline-stage-script">validate_input.py &middot; app.js: validateRow</div>
+      <div class="pipeline-stage-desc">Recompute tier, dates, and totals from the donor's own gift history, never trusted.</div>
+      <div class="pipeline-stage-annot" id="pipelineAnnotValidate"></div>
+    </div>
+    <div class="pipeline-arrow">&rarr;</div>
+    <div class="pipeline-stage">
+      <div class="pipeline-stage-num">2</div>
+      <div class="pipeline-stage-title">Calculate</div>
+      <div class="pipeline-stage-script">calculate_ask.py &middot; app.js: calculateAsk</div>
+      <div class="pipeline-stage-desc">Fixed formula, fixed step order, one rounding step, full trace per donor.</div>
+      <div class="pipeline-stage-annot">No arithmetic left to a model, ever</div>
+    </div>
+    <div class="pipeline-arrow">&rarr;</div>
+    <div class="pipeline-stage">
+      <div class="pipeline-stage-num">3</div>
+      <div class="pipeline-stage-title">Generate</div>
+      <div class="pipeline-stage-script">generate_letters.py &middot; app.js: generateForDonor</div>
+      <div class="pipeline-stage-desc">Letter model checked against a schema, then rendered, real or placeholder.</div>
+      <div class="pipeline-stage-annot" id="pipelineAnnotGenerate"></div>
+    </div>
+    <div class="pipeline-arrow">&rarr;</div>
+    <div class="pipeline-stage human">
+      <div class="pipeline-stage-num">4</div>
+      <div class="pipeline-stage-title">Human review</div>
+      <div class="pipeline-stage-script">donor_rules.py: review_level &middot; ui.js: exportReadiness</div>
+      <div class="pipeline-stage-desc">Platinum: always. Missing title or relationship manager: always. Below 0.90 confidence: held. Below 0.70: blocked.</div>
+      <div class="pipeline-stage-annot" id="pipelineAnnotReview"></div>
+    </div>
+    <div class="pipeline-arrow">&rarr;</div>
+    <div class="pipeline-stage">
+      <div class="pipeline-stage-num">5</div>
+      <div class="pipeline-stage-title">Export</div>
+      <div class="pipeline-stage-script">ui.js: exportEverything</div>
+      <div class="pipeline-stage-desc">One zip: letters, manifest, change log, and a working copy of the tool itself.</div>
+      <div class="pipeline-stage-annot">Locked until every gate above actually clears</div>
+    </div>
+  </div>
+</div>
+
 <div class="panel ready-banner" id="readyBanner">Loading...</div>
 <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
 <div id="summaryStats"></div>
 
 <div id="findingsPanel" class="panel" data-tour="findings"></div>
+
+<div id="donorComparisonPanel" class="panel" data-tour="comparison"></div>
 
 <details>
   <summary>How letters sound by tier, and why (click to expand)</summary>

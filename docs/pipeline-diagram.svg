@@ -1,0 +1,123 @@
+<svg viewBox="0 0 1560 460" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <style>
+    .bg { fill: #f7f6f3; }
+    .stage-box { fill: #ffffff; stroke: #2f6d4f; stroke-width: 2; rx: 10; }
+    .input-box { fill: #ffffff; stroke: #dfe3df; stroke-width: 1.5; rx: 8; }
+    .title { font-size: 26px; font-weight: 700; fill: #1f2420; }
+    .subtitle { font-size: 15px; fill: #5b6560; }
+    .box-title { font-size: 15px; font-weight: 700; fill: #1f2420; }
+    .box-script { font-family: "SF Mono", Consolas, monospace; font-size: 11px; fill: #2f6d4f; }
+    .box-sub { font-size: 11.5px; fill: #5b6560; }
+    .annot { font-size: 12px; fill: #a13a3a; font-weight: 600; }
+    .step-num { font-size: 13px; font-weight: 700; fill: #ffffff; }
+    .legend-text { font-size: 12px; fill: #5b6560; }
+    .arrow { stroke: #5b6560; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#5b6560"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1560" height="460"/>
+
+  <text class="title" x="20" y="34">Why the pipeline is shaped this way</text>
+  <text class="subtitle" x="20" y="58">The original skill asked a language model to hold the donor list, do the arithmetic, and write the letter, all in one step, on faith.</text>
+  <text class="subtitle" x="20" y="76">This puts a checkpoint at every place that step could go wrong, before a model ever touches the data.</text>
+
+  <!-- Inputs -->
+  <rect class="input-box" x="15" y="110" width="185" height="52"/>
+  <text class="box-title" x="27" y="130">Donor file</text>
+  <text class="box-sub" x="27" y="148">CSV or XLSX, uploaded</text>
+
+  <rect class="input-box" x="15" y="178" width="185" height="52"/>
+  <text class="box-title" x="27" y="198">Campaign config</text>
+  <text class="box-sub" x="27" y="216">JSON, charity/date/type</text>
+
+  <path class="arrow" d="M200,136 C225,136 225,180 245,180"/>
+  <path class="arrow" d="M200,204 C225,204 225,180 245,180"/>
+
+  <!-- Stage 1: Validate -->
+  <rect class="stage-box" x="250" y="110" width="220" height="100"/>
+  <circle cx="270" cy="130" r="12" fill="#2f6d4f"/>
+  <text class="step-num" x="270" y="134" text-anchor="middle">1</text>
+  <text class="box-title" x="290" y="134">Validate</text>
+  <text class="box-script" x="262" y="153">validate_input.py</text>
+  <text class="box-script" x="262" y="166">app.js: validateRow</text>
+  <text class="box-sub" x="262" y="184">Recompute tier, dates, and</text>
+  <text class="box-sub" x="262" y="197">totals from the donor's own</text>
+  <text class="box-sub" x="262" y="210">gift history, never trusted.</text>
+  <text class="annot" x="262" y="235">4 tier mismatches caught</text>
+  <text class="annot" x="262" y="250">here on this dataset</text>
+
+  <path class="arrow" d="M470,160 L525,160"/>
+
+  <!-- Stage 2: Calculate -->
+  <rect class="stage-box" x="530" y="110" width="220" height="100"/>
+  <circle cx="550" cy="130" r="12" fill="#2f6d4f"/>
+  <text class="step-num" x="550" y="134" text-anchor="middle">2</text>
+  <text class="box-title" x="570" y="134">Calculate</text>
+  <text class="box-script" x="542" y="153">calculate_ask.py</text>
+  <text class="box-script" x="542" y="166">app.js: calculateAsk</text>
+  <text class="box-sub" x="542" y="184">Fixed formula, fixed step</text>
+  <text class="box-sub" x="542" y="197">order, one rounding step,</text>
+  <text class="box-sub" x="542" y="210">full trace per donor.</text>
+  <text class="annot" x="542" y="235">No arithmetic left to a</text>
+  <text class="annot" x="542" y="250">model, ever</text>
+
+  <path class="arrow" d="M750,160 L805,160"/>
+
+  <!-- Stage 3: Generate -->
+  <rect class="stage-box" x="810" y="110" width="220" height="100"/>
+  <circle cx="830" cy="130" r="12" fill="#2f6d4f"/>
+  <text class="step-num" x="830" y="134" text-anchor="middle">3</text>
+  <text class="box-title" x="850" y="134">Generate</text>
+  <text class="box-script" x="822" y="153">generate_letters.py</text>
+  <text class="box-script" x="822" y="166">app.js: generateForDonor</text>
+  <text class="box-sub" x="822" y="184">Letter model checked</text>
+  <text class="box-sub" x="822" y="197">against a schema, then</text>
+  <text class="box-sub" x="822" y="210">rendered, real or placeholder.</text>
+  <text class="annot" x="822" y="235">Every donor gets a file,</text>
+  <text class="annot" x="822" y="250">50 of 50, no exceptions</text>
+
+  <path class="arrow" d="M1030,160 L1085,160"/>
+
+  <!-- Stage 4: Human Review -->
+  <rect class="stage-box" x="1090" y="110" width="220" height="100" stroke="#a13a3a"/>
+  <circle cx="1110" cy="130" r="12" fill="#a13a3a"/>
+  <text class="step-num" x="1110" y="134" text-anchor="middle">4</text>
+  <text class="box-title" x="1130" y="134">Human review</text>
+  <text class="box-script" x="1102" y="153">donor_rules.py: review_level</text>
+  <text class="box-sub" x="1102" y="171">Platinum: always. Missing</text>
+  <text class="box-sub" x="1102" y="184">title or relationship manager:</text>
+  <text class="box-sub" x="1102" y="197">always. Below 0.90 confidence:</text>
+  <text class="box-sub" x="1102" y="210">held. Below 0.70: blocked.</text>
+  <text class="annot" x="1102" y="235">21 of 50 donors held for a</text>
+  <text class="annot" x="1102" y="250">person on this run</text>
+
+  <path class="arrow" d="M1310,160 L1365,160"/>
+
+  <!-- Stage 5: Export -->
+  <rect class="stage-box" x="1370" y="110" width="175" height="100"/>
+  <circle cx="1390" cy="130" r="12" fill="#2f6d4f"/>
+  <text class="step-num" x="1390" y="134" text-anchor="middle">5</text>
+  <text class="box-title" x="1408" y="134">Export</text>
+  <text class="box-script" x="1382" y="153">ui.js: exportEverything</text>
+  <text class="box-sub" x="1382" y="171">One zip: letters, manifest,</text>
+  <text class="box-sub" x="1382" y="184">change log, and a working</text>
+  <text class="box-sub" x="1382" y="197">copy of the tool itself.</text>
+  <text class="annot" x="1382" y="235">Locked until every gate</text>
+  <text class="annot" x="1382" y="250">above actually clears</text>
+
+  <!-- Feedback loop: held records back to validate -->
+  <path class="arrow" d="M1090,190 C700,300 470,300 400,215" stroke-dasharray="5,4"/>
+  <text class="box-sub" x="560" y="298">held records: a person approves a fix, the file is resubmitted</text>
+
+  <!-- Legend -->
+  <rect x="20" y="400" width="14" height="14" fill="#2f6d4f"/>
+  <text class="legend-text" x="42" y="411">deterministic pipeline stage, no model involved</text>
+  <rect x="380" y="400" width="14" height="14" fill="#a13a3a"/>
+  <text class="legend-text" x="402" y="411">the one stage that puts a person, not code, in charge</text>
+  <rect x="800" y="400" width="14" height="14" fill="none" stroke="#5b6560" stroke-dasharray="3,3"/>
+  <text class="legend-text" x="822" y="411">a record correcting and re-running, never silently dropped</text>
+</svg>
