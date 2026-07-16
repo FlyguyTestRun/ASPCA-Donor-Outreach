@@ -116,7 +116,7 @@ click from the code that makes it true.
 | 5. Pick tone and salutation | Tier/Lapsed voice table; salutation format by tier, with a mandatory-review flag instead of a guess when a title is missing | [`generate_letters.py:build_salutation`](scripts/generate_letters.py), [`app.js:buildSalutation`](app.js) |
 | 6. Assign a Platinum relationship manager | Named person signs the letter if one is on file; otherwise the campaign default signs it, visibly, under mandatory review | [`generate_letters.py:build_letter_model`](scripts/generate_letters.py), [`app.js:buildLetterModel`](app.js) |
 | 7. Fill and validate the letter template | Every placeholder from verified fields, structurally checked before it ever renders | [`generate_letters.py:validate_letter_model`](scripts/generate_letters.py), [`app.js:validateLetterModel`](app.js) |
-| 8. Produce one HTML letter per donor, all of them | Every donor with a valid, generated letter gets a file, not only ones a person individually clicked | [`generate_letters.py:run`](scripts/generate_letters.py), [`ui.js:allGeneratedLetterFiles`](ui.js) |
+| 8. Produce one HTML letter per donor, all of them | Every donor gets a file, no exceptions: a real solicitation where possible, otherwise a clearly-marked internal review notice stating why and who it's assigned to, never silence | [`generate_letters.py:build_placeholder_html`](scripts/generate_letters.py), [`app.js:buildPlaceholderHtml`](app.js) |
 | 9. Gate before anything ships | Mandatory review (Platinum, tier corrections, ask exceeds gift, missing title, missing relationship manager, lapsed major donors) must clear before export unlocks | [`donor_rules.py:review_level`](scripts/donor_rules.py), [`ui.js:exportReadiness`](ui.js) |
 
 ## Running the Python pipeline
@@ -134,9 +134,10 @@ reads (both work identically; extension decides which reader runs).
 `references/campaign_config.example.json` is a complete example campaign
 configuration. `work/` and `output/` are the last run's real,
 regeneratable output, kept here as evidence the pipeline runs clean: 0
-exceptions, 4 tier labels corrected against their own lifetime totals, 48
-letters generated, 2 lapsed Platinum donors routed to personal outreach
-instead of an automated letter.
+exceptions, 4 tier labels corrected against their own lifetime totals, 50
+donors each with exactly one HTML file in `output/letters/`, 48 real
+solicitation letters and 2 internal review-notice placeholders for the
+lapsed Platinum donors routed to personal outreach instead.
 
 ## Running the interactive tool locally
 
@@ -167,8 +168,10 @@ Export is a single button, disabled until every data exception is fixed,
 every merge conflict is resolved, and every flagged donor is confirmed;
 the export panel names exactly what's still outstanding and links you
 straight to it. Once unlocked, it produces one zip: the review manifest,
-the full modified donor data, the change log, a letter for every donor
-with a valid, generated letter, `SKILL.md`, `ASSESSMENT.md`, and a
+the full modified donor data, the change log, one HTML file per donor
+with no exceptions (a real solicitation where possible, otherwise a
+clearly-marked internal review notice explaining why and who it's
+assigned to), `SKILL.md`, `ASSESSMENT.md`, and a
 working copy of the tool itself, the same package whether the person
 opening it is a fundraiser or Doug reviewing this case study. The zip is
 written by a small in-house zip function, no external library, verified

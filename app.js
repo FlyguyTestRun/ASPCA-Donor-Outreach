@@ -541,17 +541,117 @@
     return out;
   }
 
-  // Full per-donor pipeline for generation: returns {letterHtml, model, manifestNote} or {manifestNote} if no letter.
+  // A donor who gets no automated letter (routed to personal outreach,
+  // blocked by low confidence, or fails validation entirely, see ui.js's
+  // handling of State.exceptions) still gets an HTML file, per the
+  // original's "produce them (all of them)": no donor is ever silently
+  // absent from the output. Deliberately shaped nothing like TEMPLATE
+  // above, an internal review record, not a solicitation, so it can never
+  // be mistaken for one and sent by accident.
+  var PLACEHOLDER_TEMPLATE = [
+    "<html>",
+    '<body style="font-family: Georgia; padding: 30px; max-width: 600px; color: #222;">',
+    "",
+    '  <div style="background:#fff3cd; border:1px solid #997404; color:#664d03; padding:14px 18px; border-radius:8px; margin-bottom:20px;">',
+    "    <strong>Internal review notice, not a letter to send.</strong> No automated",
+    "    solicitation was generated for this donor. This page is a record for a",
+    "    person to follow up on directly.",
+    "  </div>",
+    "",
+    '  <p style="text-align:right; color: #888;">{letter_date}</p>',
+    "",
+    '  <h2 style="margin:0 0 4px;">{donor_name}</h2>',
+    '  <p style="color:#555; margin:0 0 18px;">Donor ID: {donor_id} &middot; Tier: {tier} &middot;',
+    "  Region: {region} &middot; Lifetime giving: {lifetime_total} &middot; Last gift: {last_gift_year}</p>",
+    "",
+    "  <p><strong>Why no letter was generated:</strong> {reason}</p>",
+    "",
+    "  <p><strong>Gift history on file:</strong> {gift_history}</p>",
+    "",
+    "  <p><strong>Assigned to:</strong> {assigned}</p>",
+    "",
+    "  <p>This donor needs personal outreach rather than an automated letter.",
+    "  Please follow up directly rather than sending this page to them.</p>",
+    "",
+    "</body>",
+    "</html>",
+  ].join("\n");
+
+  // Fills PLACEHOLDER_TEMPLATE from whatever is actually known about a
+  // donor. Works for a fully validated donor with no ask (most fields
+  // present) down to a donor that failed validation entirely (often only
+  // donor_id/donor_name and the reason). Anything unknown says so rather
+  // than being left blank or guessed.
+  function buildPlaceholderHtml(fields, letterDate) {
+    var defaults = {
+      donor_id: "(not on file)", donor_name: "(name not on file)",
+      tier: "(unknown)", region: "(not on file)",
+      lifetime_total: "(unknown)", last_gift_year: "(unknown)",
+      gift_history: "(not on file)", reason: "no reason recorded",
+      relationship_manager: "",
+    };
+    var merged = {};
+    Object.keys(defaults).forEach(function (k) { merged[k] = fields[k] || defaults[k]; });
+    var assigned = merged.relationship_manager || "Not yet assigned. Assign a relationship manager before any outreach.";
+    var model = {
+      letter_date: letterDate,
+      donor_id: R.esc(merged.donor_id),
+      donor_name: R.esc(merged.donor_name),
+      tier: R.esc(merged.tier),
+      region: R.esc(merged.region),
+      lifetime_total: R.esc(merged.lifetime_total),
+      last_gift_year: R.esc(merged.last_gift_year),
+      gift_history: R.esc(merged.gift_history),
+      reason: R.esc(merged.reason),
+      assigned: R.esc(assigned),
+    };
+    var out = PLACEHOLDER_TEMPLATE;
+    Object.keys(model).forEach(function (k) { out = out.split("{" + k + "}").join(model[k]); });
+    return out;
+  }
+
+  function placeholderFieldsFromDonor(donor, reason) {
+    var lifetime = donor.lifetime_total;
+    var lifetimeLabel = lifetime ? "$" + R.fmtMoney0(parseFloat(lifetime)) : "";
+    return {
+      donor_id: donor.donor_id, donor_name: donor.donor_name,
+      tier: donor.tier, region: donor.region,
+      lifetime_total: lifetimeLabel, last_gift_year: donor.last_gift_year,
+      gift_history: donor.gift_history, reason: reason,
+      relationship_manager: donor.relationship_manager,
+    };
+  }
+
+  // Full per-donor pipeline for generation: returns {letterHtml, model, note, isPlaceholder}.
   function generateForDonor(donor, config, letterDate) {
     if (!donor.ask_amount) {
-      return { letterHtml: null, model: null, note: donor.review_reasons || "blocked pending data fixes" };
+      var noAskReason = donor.review_reasons || "blocked pending data fixes";
+      return {
+        letterHtml: buildPlaceholderHtml(placeholderFieldsFromDonor(donor, noAskReason), letterDate),
+        model: null, note: noAskReason, isPlaceholder: true,
+      };
     }
     var model = buildLetterModel(donor, config, letterDate);
     var errors = validateLetterModel(model);
     if (errors.length) {
-      return { letterHtml: null, model: null, note: "letter schema validation failed: " + errors.join("; "), forceMandatory: true };
+      var schemaReason = "letter schema validation failed: " + errors.join("; ");
+      return {
+        letterHtml: buildPlaceholderHtml(placeholderFieldsFromDonor(donor, schemaReason), letterDate),
+        model: null, note: schemaReason, forceMandatory: true, isPlaceholder: true,
+      };
     }
-    return { letterHtml: renderLetterHtml(model), model: model, note: donor.review_reasons || "" };
+    return { letterHtml: renderLetterHtml(model), model: model, note: donor.review_reasons || "", isPlaceholder: false };
+  }
+
+  // For a donor who never made it past validateRow (missing required
+  // fields, unparseable gift_history, a duplicate donor_id): ui.js calls
+  // this for each row in State.exceptions so those donors also get a file
+  // in the export, built from whatever raw fields survived.
+  function generateExceptionPlaceholder(exception, letterDate) {
+    var reason = "failed validation: " + (exception.reason || "");
+    return buildPlaceholderHtml({
+      donor_id: exception.donor_id, donor_name: exception.donor_name, reason: reason,
+    }, letterDate);
   }
 
   var App = {
@@ -566,6 +666,7 @@
     validateLetterModel: validateLetterModel,
     renderLetterHtml: renderLetterHtml,
     generateForDonor: generateForDonor,
+    generateExceptionPlaceholder: generateExceptionPlaceholder,
     TIER_VOICE: TIER_VOICE,
     BASE_PARAGRAPHS: BASE_PARAGRAPHS,
   };

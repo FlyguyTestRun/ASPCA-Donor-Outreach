@@ -161,6 +161,45 @@ test("lapsed donor gets the Lapsed apologetic voice, not their underlying tier's
   assert.ok(/missed/i.test(lapsed.opening_paragraph));
 });
 
+test("a donor with no ask_amount still gets a placeholder HTML, not nothing", function () {
+  var donor = {
+    donor_id: "D001", donor_name: "Robert Svensson", tier: "Platinum", status: "lapsed",
+    region: "Northeast", lifetime_total: "145000", last_gift_year: "2020",
+    gift_history: "2010:25000;2013:30000;2016:40000;2020:50000",
+    review_reasons: "lapsed Platinum donor: route to personal outreach, no automated letter",
+    ask_amount: "",
+  };
+  var gen = App.generateForDonor(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(gen.isPlaceholder, true);
+  assert.ok(gen.letterHtml, "placeholder HTML should not be empty");
+  assert.ok(/Internal review notice/.test(gen.letterHtml));
+  assert.ok(/Robert Svensson/.test(gen.letterHtml));
+  assert.ok(/route to personal outreach/.test(gen.letterHtml));
+  assert.ok(/Not yet assigned/.test(gen.letterHtml));
+});
+
+test("a placeholder names the assigned relationship manager when one is on file", function () {
+  var donor = {
+    donor_id: "D001", donor_name: "Robert Svensson", tier: "Platinum", status: "lapsed",
+    region: "Northeast", lifetime_total: "145000", last_gift_year: "2020",
+    gift_history: "2010:25000", review_reasons: "lapsed Platinum donor: route to personal outreach",
+    ask_amount: "", relationship_manager: "Pat Nguyen",
+  };
+  var gen = App.generateForDonor(donor, BASE_CONFIG, "June 30, 2024");
+  assert.ok(/Pat Nguyen/.test(gen.letterHtml));
+  assert.ok(!/Not yet assigned/.test(gen.letterHtml));
+});
+
+test("an exception (failed validation entirely) still gets a minimal placeholder", function () {
+  var html = App.generateExceptionPlaceholder(
+    { donor_id: "D999", donor_name: "Test Broken Donor", reason: "missing required field(s): gift_history" },
+    "June 30, 2024"
+  );
+  assert.ok(/Internal review notice/.test(html));
+  assert.ok(/Test Broken Donor/.test(html));
+  assert.ok(/missing required field\(s\): gift_history/.test(html));
+});
+
 if (failures.length) {
   console.log("\n" + failures.length + " FAILURE(S)");
   process.exit(1);

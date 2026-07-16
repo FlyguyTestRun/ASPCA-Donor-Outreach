@@ -231,8 +231,8 @@ data-quality warnings a record accumulated (each costs 0.10): a stated
 field that did not parse, or a stated value that disagreed with what
 `gift_history` computes.
 
-- **Below 0.70: fail.** The record is blocked. No letter is generated
-  until the data is fixed and the file is resubmitted.
+- **Below 0.70: fail.** No automated solicitation is generated; see
+  "Every donor gets a file" below for what is produced instead.
 - **Below 0.90: report.** A letter is generated but held for review.
 - **0.90 and above: pass.** Any remaining warning still flags
   recommended review; a clean record needs none.
@@ -251,6 +251,31 @@ donor has no relationship manager assigned, so their letter is signed
 by the campaign's default signer instead of a named person. A record
 can have a perfect data-quality score and still be mandatory for one of
 these reasons, on purpose.
+
+## Every donor gets a file
+
+"Fill in the letter templates... and produce them (all of them)" is
+literal: every donor in the input, without exception, ends the run with
+exactly one HTML file, whether or not an automated solicitation was
+possible for them.
+
+A donor who does not get a real letter, whether routed to personal
+outreach (a lapsed Gold or Platinum major donor), blocked by a
+confidence score below 0.70, a letter that failed its own structural
+validation, or a donor who never passed `validate_input.py` at all
+(missing required fields, unparseable `gift_history`, a duplicate
+`donor_id`) still gets an HTML file: a clearly marked internal review
+notice, never shaped like the real letter template so it can never be
+sent by mistake, stating plainly why no letter was generated, whatever
+of the donor's data is actually known, and who it is assigned to. That
+last part reuses the same `relationship_manager` field Platinum's
+letters use for their signer (see Voice by tier), generalized here to
+any tier: if a name is on file, the notice says so; if not, it says
+"Not yet assigned. Assign a relationship manager before any outreach."
+rather than leaving the question unanswered. Every such donor still
+gets a `manifest.csv`/export row too, `review_level: mandatory`, so
+that spreadsheet is a complete accounting of the whole input file, not
+only the portion that produced a sendable letter.
 
 In practice, with the sample data as shipped (no `title` or
 `relationship_manager` populated for any donor), essentially every

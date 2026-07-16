@@ -104,6 +104,7 @@
     computed.letter_html = gen.letterHtml;
     computed.letter_model = gen.model;
     computed.generation_note = gen.note;
+    computed.is_placeholder = !!gen.isPlaceholder;
     if (gen.forceMandatory) computed.review_level = "mandatory";
     return computed;
   }
@@ -200,6 +201,26 @@
   }
 
   // ---- loading / merging donor data ----
+  // A donor who needs manual follow-up (routed to personal outreach,
+  // blocked by low confidence, or failed validation entirely) is worth a
+  // named entry in the change log at the point the data was loaded, not
+  // just a row in the manifest a person might not open. One consolidated
+  // entry per load/merge, not one per donor, so this stays a useful
+  // signal instead of routine noise.
+  function logPlaceholderSummary() {
+    var placeholders = State.order.filter(function (id) {
+      return State.results[id] && State.results[id].is_placeholder;
+    }).map(function (id) { return State.results[id].donor_name + " (" + id + ")"; });
+    var exceptionNames = State.exceptions.map(function (exc) {
+      return (exc.donor_name || exc.donor_id || "unnamed") + (exc.donor_id ? " (" + exc.donor_id + ")" : "");
+    });
+    if (!placeholders.length && !exceptionNames.length) return;
+    var parts = [];
+    if (placeholders.length) parts.push(placeholders.length + " donor(s) need personal outreach, no automated letter: " + placeholders.join(", "));
+    if (exceptionNames.length) parts.push(exceptionNames.length + " donor(s) failed validation and need manual review: " + exceptionNames.join(", "));
+    logChange("", "", "needs-review", parts.join(". ") + ".");
+  }
+
   function loadDonorsReplace(rows) {
     State.donors = {};
     State.order = [];
@@ -213,6 +234,8 @@
     });
     State.changeLog.push({ time: new Date().toISOString(), donor_id: "", donor_name: "", kind: "load", description: "Loaded " + rows.length + " donor(s), replacing the working set." });
     recompute();
+    logPlaceholderSummary();
+    renderChangeLog();
   }
 
   function mergeDonors(rows, sourceLabel) {
@@ -237,6 +260,8 @@
     }
     if (addedCount) toast("Added " + addedCount + " new donor(s) from " + sourceLabel + ".", "ok");
     recompute();
+    logPlaceholderSummary();
+    renderChangeLog();
   }
 
   function resolveConflict(index, choice) {
@@ -373,6 +398,17 @@
         confirmed: State.confirmed[id] ? "Yes" : "No", notes: r.review_reasons,
       };
     }).filter(Boolean);
+    // Every donor that failed validation entirely still gets a manifest
+    // row, same as the batch pipeline: "produce them (all of them)" does
+    // not stop at "all of them that validated cleanly."
+    State.exceptions.forEach(function (exc) {
+      rows.push({
+        donor_id: exc.donor_id || "", donor_name: exc.donor_name || "",
+        tier: "", status: "", ask_amount: "", confidence: "",
+        review_level: "mandatory", confirmed: "No",
+        notes: "failed validation: " + exc.reason,
+      });
+    });
     return App.toCsv(rows, ["donor_id", "donor_name", "tier", "status", "ask_amount", "confidence", "review_level", "confirmed", "notes"]);
   }
 
@@ -411,9 +447,22 @@
   // otherwise silently never ship.
   function allGeneratedLetterFiles() {
     var ids = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html; });
-    return ids.map(function (id) {
+    var files = ids.map(function (id) {
       return { name: State.results[id].donor_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html", content: State.results[id].letter_html };
     });
+    // A donor who failed validation entirely still gets a file in the
+    // export, same reasoning as allGeneratedLetterFiles above and
+    // buildManifestCsv: no donor is silently absent from the output.
+    var letterDate = R.letterDateLabel(State.config);
+    State.exceptions.forEach(function (exc) {
+      var id = exc.donor_id || ("exception-" + exc.line);
+      var name = exc.donor_name || id;
+      files.push({
+        name: name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html",
+        content: App.generateExceptionPlaceholder(exc, letterDate),
+      });
+    });
+    return files;
   }
 
   // ---- export readiness gate ----
@@ -648,7 +697,8 @@
       var r = State.results[id];
       return r && (r.mandatory_reasons || "").indexOf("tier corrected") !== -1;
     }).length;
-    var generated = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html; }).length;
+    var generated = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html && !State.results[id].is_placeholder; }).length;
+    var needsOutreach = State.order.filter(function (id) { return State.results[id] && State.results[id].is_placeholder; }).length;
     var mandatory = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "mandatory"; }).length;
     var confirmedCount = Object.keys(State.confirmed).filter(function (id) { return State.confirmed[id]; }).length;
     var needsReview = State.order.filter(function (id) {
@@ -662,6 +712,7 @@
       [excCount, "Exceptions"],
       [tierMismatches, "Tier labels corrected"],
       [generated, "Letters generated"],
+      [needsOutreach, "Needs personal outreach"],
       [mandatory, "Mandatory review"],
       [confirmedCount, "Confirmed"],
       [needsReview, "Awaiting confirmation"],

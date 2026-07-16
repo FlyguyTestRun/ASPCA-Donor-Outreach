@@ -506,10 +506,10 @@ real donor gets asked for.
 
 A later review pass, driven by directly re-reading Doug's original file
 line by line rather than working from an earlier assessment of it, found
-one real defect and three places where this build had quietly done more
-than the brief asked for and called it an improvement. All four are fixed.
+two real defects and three places where this build had quietly done more
+than the brief asked for and called it an improvement. All five are fixed.
 
-**The real defect: the export dropped most letters silently.** The
+**Real defect 1: the export dropped most letters silently.** The
 interactive tool's "download everything" export filtered letters by
 `State.confirmed[id]`, the per-donor review checkbox. That checkbox is
 only ever set for donors flagged `mandatory` or `recommended`; a donor
@@ -527,6 +527,28 @@ which already-cleared letters make it into the zip. This was a pure
 interactive-tool bug: `scripts/generate_letters.py` and its manifest were
 correct the entire time, confirmed by re-running the batch path fresh and
 counting `output/letters/*.html` directly.
+
+**Real defect 2: a donor with no automated letter got no file at all.**
+Even after fixing defect 1, two donors (D001, D003, lapsed Platinum
+major donors routed to personal outreach) still produced nothing:
+`generate_letters.py` recorded them in the manifest with an empty
+`letter_file` and moved on, and the same happened for the (currently
+zero, but structurally possible) cases of a confidence-fail block, a
+letter that fails its own schema validation, or a donor who never
+passes `validate_input.py` at all. "Produce them (all of them)" does not
+have an exception clause for "the ones that were hard." *Fix:* every one
+of those cases now gets an HTML file: a clearly marked internal review
+notice, never shaped like the real letter template so it can never be
+mistaken for one and sent, stating why no letter was generated, whatever
+of the donor's data is actually known, and who it is assigned to
+(`generate_letters.build_placeholder_html`, `app.js:buildPlaceholderHtml`,
+mirrored for validation-exception donors via
+`generate_exception_placeholder`/`generateExceptionPlaceholder`). A
+donor who failed validation entirely now gets a `manifest.csv` row too,
+something the original design never produced at all. On the case
+study's own 50 donors: 48 real solicitation letters plus 2 placeholder
+review notices, 50 files for 50 donors, 0 exceptions to place a
+placeholder for on this particular dataset.
 
 **Deviation 1: the Platinum relationship manager requirement was removed,
 not implemented.** The original assigns a personal relationship manager
@@ -635,20 +657,26 @@ replace a model doing this arithmetic in prose.
 
 **4. "Use the giving history for each donor from the tables below to
 personalise the letters making sure all are produced in the OUTPUT."**
-Satisfied, and this is the literal specification for the bug fixed in
+Satisfied, and this is the literal specification for both bugs fixed in
 Part 8: "making sure all are produced" is exactly what the interactive
-tool's export failed to guarantee before this pass. The "tables below"
-(the hardcoded 50-row example in the original) are not a data source in
-this rewrite at all, `sample-donors.csv` stands in for "an uploaded
-file," per the fix in Part 1 ("Embedded data" finding): the skill holds
-no donor data of its own.
+tool's export failed to guarantee (defect 1), and exactly what a
+donor with no automated ask used to fail to produce anything for at all
+(defect 2, now a placeholder review notice, not silence). The "tables
+below" (the hardcoded 50-row example in the original) are not a data
+source in this rewrite at all, `sample-donors.csv` stands in for "an
+uploaded file," per the fix in Part 1 ("Embedded data" finding): the
+skill holds no donor data of its own.
 
 **5. "Fill in the letter templates, verify with gates and produce them
 (all of them) in the OUTPUT file with the exported files and all HTMLs 1
-per letter with summary as HTML."** Satisfied. One HTML file per donor in
-`output/letters/` (batch path) or in the exported zip's `letters/`
-folder (interactive path, fixed in Part 8 to actually include all of
-them). `output/manifest.csv` is the run summary, one row per donor,
+per letter with summary as HTML."** Satisfied literally: every donor,
+without exception, gets exactly one HTML file, in `output/letters/`
+(batch path) or the exported zip's `letters/` folder (interactive
+path). A donor who gets a real solicitation gets the letter template
+filled in; a donor who does not (routed to personal outreach, blocked,
+or never validated) gets a placeholder review notice instead, per
+Part 8's second defect fix, never silence. `output/manifest.csv` is the
+run summary, one row per donor including validation-exception donors,
 tier/status/ask/review level/letter file/notes; the interactive tool's
 `manifest.csv` export and on-page summary stats serve the same purpose.
 "Verify with gates" is `validate_letter_model` (structural check before

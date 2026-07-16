@@ -288,6 +288,39 @@ class RelationshipManagerGateTests(unittest.TestCase):
         self.assertEqual(model["signer_title"], "Director")
 
 
+class PlaceholderLetterTests(unittest.TestCase):
+    def test_no_ask_donor_gets_a_placeholder_not_nothing(self):
+        html = generate_letters.build_placeholder_html({
+            "donor_id": "D001", "donor_name": "Robert Svensson", "tier": "Platinum",
+            "region": "Northeast", "lifetime_total": "$145,000", "last_gift_year": "2020",
+            "gift_history": "2010:25000;2013:30000;2016:40000;2020:50000",
+            "reason": "lapsed Platinum donor: route to personal outreach, no automated letter",
+        }, "June 30, 2024")
+        self.assertIn("Internal review notice", html)
+        self.assertIn("Robert Svensson", html)
+        self.assertIn("route to personal outreach", html)
+        self.assertIn("Not yet assigned", html)
+
+    def test_placeholder_names_the_assigned_relationship_manager(self):
+        html = generate_letters.build_placeholder_html({
+            "donor_id": "D001", "donor_name": "Robert Svensson", "reason": "routed",
+            "relationship_manager": "Pat Nguyen",
+        }, "June 30, 2024")
+        self.assertIn("Pat Nguyen", html)
+        self.assertNotIn("Not yet assigned", html)
+
+    def test_placeholder_works_with_almost_nothing_known(self):
+        # An exception donor: only donor_id/donor_name/reason are ever
+        # available, everything else is genuinely unknown.
+        html = generate_letters.build_placeholder_html({
+            "donor_id": "D999", "donor_name": "Test Broken Donor",
+            "reason": "failed validation: missing required field(s): gift_history",
+        }, "June 30, 2024")
+        self.assertIn("Test Broken Donor", html)
+        self.assertIn("missing required field(s)", html)
+        self.assertIn("(unknown)", html)
+
+
 class GivingStreakTests(unittest.TestCase):
     def test_consecutive_years_counted_correctly(self):
         # Gifts in 2021, 2022, 2023; as_of_year 2024 -> streak of 3 ending 2023.

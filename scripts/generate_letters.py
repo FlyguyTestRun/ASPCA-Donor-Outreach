@@ -247,6 +247,69 @@ TEMPLATE = """<html>
 </html>
 """
 
+# A donor who gets no automated letter (routed to personal outreach,
+# blocked by low confidence, or failed validation entirely) still gets an
+# HTML file, per the original's "produce them (all of them)": no donor is
+# ever silently absent from the output. Deliberately shaped nothing like
+# TEMPLATE above, an internal review record, not a solicitation, so it can
+# never be mistaken for one and sent by accident.
+PLACEHOLDER_TEMPLATE = """<html>
+<body style="font-family: Georgia; padding: 30px; max-width: 600px; color: #222;">
+
+  <div style="background:#fff3cd; border:1px solid #997404; color:#664d03; padding:14px 18px; border-radius:8px; margin-bottom:20px;">
+    <strong>Internal review notice, not a letter to send.</strong> No automated
+    solicitation was generated for this donor. This page is a record for a
+    person to follow up on directly.
+  </div>
+
+  <p style="text-align:right; color: #888;">{letter_date}</p>
+
+  <h2 style="margin:0 0 4px;">{donor_name}</h2>
+  <p style="color:#555; margin:0 0 18px;">Donor ID: {donor_id} &middot; Tier: {tier} &middot;
+  Region: {region} &middot; Lifetime giving: {lifetime_total} &middot; Last gift: {last_gift_year}</p>
+
+  <p><strong>Why no letter was generated:</strong> {reason}</p>
+
+  <p><strong>Gift history on file:</strong> {gift_history}</p>
+
+  <p><strong>Assigned to:</strong> {assigned}</p>
+
+  <p>This donor needs personal outreach rather than an automated letter.
+  Please follow up directly rather than sending this page to them.</p>
+
+</body>
+</html>
+"""
+
+
+def build_placeholder_html(fields: dict, letter_date: str) -> str:
+    """Fill PLACEHOLDER_TEMPLATE from whatever is actually known about a
+    donor. Works for a fully validated donor with no ask (most fields
+    present) down to a donor that failed validation entirely (often only
+    donor_id/donor_name and the reason). Anything unknown says so rather
+    than being left blank or guessed."""
+    defaults = {
+        "donor_id": "(not on file)", "donor_name": "(name not on file)",
+        "tier": "(unknown)", "region": "(not on file)",
+        "lifetime_total": "(unknown)", "last_gift_year": "(unknown)",
+        "gift_history": "(not on file)", "reason": "no reason recorded",
+        "relationship_manager": "",
+    }
+    merged = {**defaults, **{k: v for k, v in fields.items() if v}}
+    assigned = merged["relationship_manager"] or "Not yet assigned. Assign a relationship manager before any outreach."
+    return PLACEHOLDER_TEMPLATE.format(
+        letter_date=letter_date,
+        donor_id=rules.esc(merged["donor_id"]),
+        donor_name=rules.esc(merged["donor_name"]),
+        tier=rules.esc(merged["tier"]),
+        region=rules.esc(merged["region"]),
+        lifetime_total=rules.esc(merged["lifetime_total"]),
+        last_gift_year=rules.esc(merged["last_gift_year"]),
+        gift_history=rules.esc(merged["gift_history"]),
+        reason=rules.esc(merged["reason"]),
+        assigned=rules.esc(assigned),
+    )
+
 
 def run(config_path: Path, workdir: Path, outdir: Path) -> None:
     started = time.perf_counter()
@@ -269,16 +332,35 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
     for stale in letters_dir.glob("*.html"):
         stale.unlink()
 
+    def placeholder_fields(donor: dict, reason: str) -> dict:
+        lifetime = donor.get("lifetime_total") or ""
+        try:
+            lifetime = f"${float(lifetime):,.0f}" if lifetime else ""
+        except ValueError:
+            pass
+        return {
+            "donor_id": donor.get("donor_id", ""), "donor_name": donor.get("donor_name", ""),
+            "tier": donor.get("tier", ""), "region": donor.get("region", ""),
+            "lifetime_total": lifetime, "last_gift_year": donor.get("last_gift_year", ""),
+            "gift_history": donor.get("gift_history", ""), "reason": reason,
+            "relationship_manager": donor.get("relationship_manager", ""),
+        }
+
     manifest_rows: list[dict] = []
     generated = 0
+    placeholders = 0
     for donor in donors:
         if not donor["ask_amount"]:
             reason = donor["review_reasons"] or "blocked pending data fixes"
+            html_out = build_placeholder_html(placeholder_fields(donor, reason), letter_date)
+            letter_file = f"{donor['donor_id']}.html"
+            (letters_dir / letter_file).write_text(html_out, encoding="utf-8")
+            placeholders += 1
             manifest_rows.append({
                 "donor_id": donor["donor_id"], "donor_name": donor["donor_name"],
                 "tier": donor["tier"], "status": donor["status"],
                 "ask_amount": "", "confidence": donor["confidence"],
-                "review_level": donor["review_level"], "letter_file": "",
+                "review_level": donor["review_level"], "letter_file": f"letters/{letter_file}",
                 "notes": reason, "rules_version": donor.get("rules_version", rules.RULES_VERSION),
             })
             continue
@@ -286,12 +368,17 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
         model = build_letter_model(donor, config, letter_date)
         errors = validate_letter_model(model)
         if errors:
+            reason = "letter schema validation failed: " + "; ".join(errors)
+            html_out = build_placeholder_html(placeholder_fields(donor, reason), letter_date)
+            letter_file = f"{donor['donor_id']}.html"
+            (letters_dir / letter_file).write_text(html_out, encoding="utf-8")
+            placeholders += 1
             manifest_rows.append({
                 "donor_id": donor["donor_id"], "donor_name": donor["donor_name"],
                 "tier": donor["tier"], "status": donor["status"],
                 "ask_amount": donor["ask_amount"], "confidence": donor["confidence"],
-                "review_level": "mandatory", "letter_file": "",
-                "notes": "letter schema validation failed: " + "; ".join(errors),
+                "review_level": "mandatory", "letter_file": f"letters/{letter_file}",
+                "notes": reason,
                 "rules_version": donor.get("rules_version", rules.RULES_VERSION),
             })
             continue
@@ -309,6 +396,32 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
             "rules_version": donor.get("rules_version", rules.RULES_VERSION),
         })
 
+    # A donor who never made it past validate_input.py (missing required
+    # fields, unparseable gift_history, a duplicate donor_id) still gets a
+    # placeholder and a manifest row here, built from whatever raw fields
+    # survived: the original's "produce them (all of them)" does not stop
+    # at "all of them that validated cleanly."
+    exceptions_path = workdir / "exceptions.csv"
+    if exceptions_path.exists():
+        with exceptions_path.open(newline="", encoding="utf-8") as handle:
+            exception_rows = list(csv.DictReader(handle))
+        for exc in exception_rows:
+            donor_id = (exc.get("donor_id") or "").strip() or f"exception-line{exc.get('line', '?')}"
+            donor_name = exc.get("donor_name") or ""
+            reason = f"failed validation: {exc.get('reason', '')}"
+            html_out = build_placeholder_html({
+                "donor_id": donor_id, "donor_name": donor_name, "reason": reason,
+            }, letter_date)
+            letter_file = f"{donor_id}.html"
+            (letters_dir / letter_file).write_text(html_out, encoding="utf-8")
+            placeholders += 1
+            manifest_rows.append({
+                "donor_id": donor_id, "donor_name": donor_name,
+                "tier": "", "status": "", "ask_amount": "", "confidence": "",
+                "review_level": "mandatory", "letter_file": f"letters/{letter_file}",
+                "notes": reason, "rules_version": rules.RULES_VERSION,
+            })
+
     manifest_path = outdir / "manifest.csv"
     with manifest_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(manifest_rows[0].keys()) if manifest_rows else [])
@@ -316,12 +429,14 @@ def run(config_path: Path, workdir: Path, outdir: Path) -> None:
         writer.writerows(rules.csv_safe_row(r) for r in manifest_rows)
 
     mandatory = sum(1 for r in manifest_rows if r["review_level"] == "mandatory" and r["letter_file"])
-    no_letter = sum(1 for r in manifest_rows if not r["letter_file"])
+    missing_file = sum(1 for r in manifest_rows if not r["letter_file"])
     elapsed_ms = round((time.perf_counter() - started) * 1000)
 
-    print(f"letters generated:  {generated} (output/letters/)")
-    print(f"no letter (routed to a person): {no_letter}")
-    print(f"generated letters needing mandatory review before anything is sent: {mandatory}")
+    print(f"solicitation letters generated: {generated} (output/letters/)")
+    print(f"placeholder pages (no automated ask; needs personal outreach): {placeholders}")
+    print(f"total donors with a file in output/letters/: {generated + placeholders} of {len(manifest_rows)}")
+    print(f"donors with no file at all: {missing_file} (should always be 0)")
+    print(f"files needing mandatory review before anything is sent: {mandatory}")
     print(f"manifest:            output/manifest.csv")
     print(f"elapsed: {elapsed_ms} ms, zero model calls")
     print("Nothing generated by this run is sent automatically.")
