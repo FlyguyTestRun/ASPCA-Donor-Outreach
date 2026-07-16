@@ -445,10 +445,15 @@
   // filter which of the already-cleared letters make it into the zip, a
   // donor whose review_level is "none" has nothing to confirm and would
   // otherwise silently never ship.
+  // Donor ID leads the filename, not the name, so the letters/ folder
+  // sorts by donor number (D001, D002, D003...) in any plain file
+  // listing, the same order the on-page table and manifest.csv use, not
+  // an alphabetical shuffle by first name.
   function allGeneratedLetterFiles() {
     var ids = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html; });
     var files = ids.map(function (id) {
-      return { name: State.results[id].donor_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html", content: State.results[id].letter_html };
+      var slug = State.results[id].donor_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      return { name: id + "-" + slug + ".html", content: State.results[id].letter_html };
     });
     // A donor who failed validation entirely still gets a file in the
     // export, same reasoning as allGeneratedLetterFiles above and
@@ -457,8 +462,9 @@
     State.exceptions.forEach(function (exc) {
       var id = exc.donor_id || ("exception-" + exc.line);
       var name = exc.donor_name || id;
+      var slug = name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       files.push({
-        name: name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html",
+        name: id + "-" + slug + ".html",
         content: App.generateExceptionPlaceholder(exc, letterDate),
       });
     });
@@ -825,7 +831,8 @@
       var confirmed = !!State.confirmed[id];
       var needsAttention = (r.review_level === "mandatory" || r.review_level === "recommended");
       return '<tr class="row' + (needsAttention && !confirmed ? " needs-attention" : "") + '">' +
-        '<td>' + R.esc(r.donor_name) + ' <span class="badge-empty">' + R.esc(id) + '</span></td>' +
+        '<td>' + R.esc(id) + '</td>' +
+        '<td>' + R.esc(r.donor_name) + '</td>' +
         '<td>' + R.esc(r.tier) + (r.tier === "Platinum" ? ' <span class="pill bad">always review</span>' : "") + '</td>' +
         '<td>' + R.esc(r.status) + '</td>' +
         '<td>' + (r.ask_amount ? "$" + Number(r.ask_amount).toLocaleString() : "n/a") + '</td>' +
