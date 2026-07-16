@@ -86,6 +86,81 @@ test("crc32 is stable and distinguishes different content", function () {
   assert.notStrictEqual(a, c);
 });
 
+var BASE_CONFIG = {
+  charity_name: "ASPCA", signer_name: "Jordan Ellis", signer_title: "Director",
+  campaign_type: "annual_fund", donation_url: "https://x.org/donate", match_confirmed: false,
+};
+
+test("lapsed salutation overrides the donor's own computed tier format", function () {
+  var donor = {
+    donor_id: "D030", donor_name: "Michael Torres", title: "", tier: "Silver", status: "lapsed",
+    lifetime_total: "1800", streak: "0", ask_amount: "50",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.salutation, "We've missed you, Michael!");
+});
+
+test("silver/bronze salutation is first name only", function () {
+  var donor = {
+    donor_id: "D018", donor_name: "Margaret Alcott", title: "", tier: "Silver", status: "active",
+    lifetime_total: "4950", streak: "0", ask_amount: "400",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.salutation, "Hi Margaret,");
+});
+
+test("platinum/gold salutation uses title + last name when present", function () {
+  var donor = {
+    donor_id: "D001", donor_name: "Robert Svensson", title: "Dr.", tier: "Platinum", status: "active",
+    lifetime_total: "145000", streak: "0", ask_amount: "20000", relationship_manager: "",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.salutation, "Dear Dr. Svensson,");
+});
+
+test("platinum/gold salutation falls back to full name when no title on file", function () {
+  var donor = {
+    donor_id: "D002", donor_name: "Earl Fontaine", title: "", tier: "Platinum", status: "active",
+    lifetime_total: "275000", streak: "0", ask_amount: "36100", relationship_manager: "",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.salutation, "Dear Earl Fontaine,");
+});
+
+test("platinum relationship manager, when present, signs the letter instead of the campaign signer", function () {
+  var donor = {
+    donor_id: "D001", donor_name: "Robert Svensson", title: "", tier: "Platinum", status: "active",
+    lifetime_total: "145000", streak: "0", ask_amount: "20000", relationship_manager: "Pat Nguyen",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.signer_name, "Pat Nguyen");
+  assert.strictEqual(model.signer_title, "Personal Relationship Manager");
+});
+
+test("platinum relationship manager absent falls back to the campaign's default signer", function () {
+  var donor = {
+    donor_id: "D001", donor_name: "Robert Svensson", title: "", tier: "Platinum", status: "active",
+    lifetime_total: "145000", streak: "0", ask_amount: "20000", relationship_manager: "",
+  };
+  var model = App.buildLetterModel(donor, BASE_CONFIG, "June 30, 2024");
+  assert.strictEqual(model.signer_name, "Jordan Ellis");
+  assert.strictEqual(model.signer_title, "Director");
+});
+
+test("lapsed donor gets the Lapsed apologetic voice, not their underlying tier's voice", function () {
+  var lapsed = App.buildLetterModel({
+    donor_id: "D030", donor_name: "Michael Torres", title: "", tier: "Silver", status: "lapsed",
+    lifetime_total: "1800", streak: "0", ask_amount: "50",
+  }, BASE_CONFIG, "June 30, 2024");
+  var active = App.buildLetterModel({
+    donor_id: "D018", donor_name: "Margaret Alcott", title: "", tier: "Silver", status: "active",
+    lifetime_total: "1800", streak: "0", ask_amount: "400",
+  }, BASE_CONFIG, "June 30, 2024");
+  assert.notStrictEqual(lapsed.opening_paragraph, active.opening_paragraph);
+  assert.notStrictEqual(lapsed.closing_phrase, active.closing_phrase);
+  assert.ok(/missed/i.test(lapsed.opening_paragraph));
+});
+
 if (failures.length) {
   console.log("\n" + failures.length + " FAILURE(S)");
   process.exit(1);

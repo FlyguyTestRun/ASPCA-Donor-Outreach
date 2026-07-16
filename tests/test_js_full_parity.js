@@ -38,7 +38,7 @@ if (!pyValidated.length || !pyComputed.length) {
 var pyById = {};
 pyValidated.forEach(function (r) { pyById[r.donor_id] = r; });
 
-var VALIDATED_FIELDS = ["donor_name", "title", "region", "largest_gift", "lifetime_total", "last_gift_year", "volunteer", "tier", "status", "warnings", "mandatory_reasons"];
+var VALIDATED_FIELDS = ["donor_name", "title", "region", "relationship_manager", "largest_gift", "lifetime_total", "last_gift_year", "volunteer", "tier", "status", "warnings", "mandatory_reasons"];
 
 var mismatches = 0;
 if (validated.validated.length !== pyValidated.length) {

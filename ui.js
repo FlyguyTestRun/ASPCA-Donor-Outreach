@@ -264,7 +264,8 @@
     }
     var row = {
       donor_id: id, donor_name: fields.donor_name || "", title: fields.title || "",
-      region: fields.region || "", gift_history: fields.gift_history || "",
+      region: fields.region || "", relationship_manager: fields.relationship_manager || "",
+      gift_history: fields.gift_history || "",
       volunteer: fields.volunteer || "No", tier: "", largest_gift: "", lifetime_total: "", last_gift_year: "",
     };
     State.donors[id] = row;
@@ -381,6 +382,7 @@
       var d = State.donors[id];
       return {
         donor_id: id, donor_name: d.donor_name, title: d.title || "", region: d.region || "",
+        relationship_manager: d.relationship_manager || "",
         gift_history: d.gift_history, tier: r.tier || "", status: r.status || "",
         largest_gift: r.largest_gift || "", lifetime_total: r.lifetime_total || "",
         last_gift_year: r.last_gift_year || "", volunteer: r.volunteer || d.volunteer || "",
@@ -388,7 +390,7 @@
         confirmed: State.confirmed[id] ? "Yes" : "No",
       };
     });
-    return App.toCsv(rows, ["donor_id", "donor_name", "title", "region", "gift_history", "tier", "status", "largest_gift", "lifetime_total", "last_gift_year", "volunteer", "ask_amount", "confidence", "review_level", "confirmed"]);
+    return App.toCsv(rows, ["donor_id", "donor_name", "title", "region", "relationship_manager", "gift_history", "tier", "status", "largest_gift", "lifetime_total", "last_gift_year", "volunteer", "ask_amount", "confidence", "review_level", "confirmed"]);
   }
 
   function buildChangeSummaryCsv() {
@@ -398,9 +400,18 @@
     return App.toCsv(rows, ["time", "donor_id", "donor_name", "type", "what_changed"]);
   }
 
-  function confirmedLetterFiles() {
-    var confirmedIds = State.order.filter(function (id) { return State.confirmed[id] && State.results[id] && State.results[id].letter_html; });
-    return confirmedIds.map(function (id) {
+  // Every donor with a valid, generated letter gets one in the export,
+  // the same rule scripts/generate_letters.py follows for the batch path
+  // (it writes output/letters/<id>.html for every donor with an
+  // ask_amount, with no separate per-donor "confirmed" concept at all).
+  // Confirmation is what gates whether the export button is unlocked in
+  // the first place (see exportReadiness); it was never meant to also
+  // filter which of the already-cleared letters make it into the zip, a
+  // donor whose review_level is "none" has nothing to confirm and would
+  // otherwise silently never ship.
+  function allGeneratedLetterFiles() {
+    var ids = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html; });
+    return ids.map(function (id) {
       return { name: State.results[id].donor_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html", content: State.results[id].letter_html };
     });
   }
@@ -476,7 +487,7 @@
       { name: "ASSESSMENT.md", content: (window.ASSESSMENT_MD_TEXT || "") },
     ];
     if (window.README_MD_TEXT) files.push({ name: "README.md", content: window.README_MD_TEXT });
-    var letters = confirmedLetterFiles();
+    var letters = allGeneratedLetterFiles();
     letters.forEach(function (f) { files.push({ name: "letters/" + f.name, content: f.content }); });
     // A working copy of this exact page, live DOM serialized back to
     // HTML, not the original template: opening it lands on whatever was
@@ -485,7 +496,7 @@
     var selfCopy = "<!doctype html>\n" + document.documentElement.outerHTML;
     files.push({ name: "donor-data-review.html", content: selfCopy });
     downloadBytes(App.makeZipBytes(files), "donor-outreach-package.zip", "application/zip");
-    toast("Downloaded the complete package: records, SKILL.md, the assessment, and the tool itself (" + letters.length + " confirmed letter(s)), in one zip.", "ok");
+    toast("Downloaded the complete package: records, SKILL.md, the assessment, and the tool itself (" + letters.length + " letter(s), every donor with a valid, generated letter), in one zip.", "ok");
   }
 
   function downloadBytes(bytes, filename, mime) {
@@ -843,7 +854,7 @@
     var row = State.donors[donorId];
     var view = document.getElementById("editView");
     document.getElementById("editDonorId").textContent = donorId;
-    ["donor_name", "title", "region", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
+    ["donor_name", "title", "region", "relationship_manager", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
       var el = document.getElementById("edit_" + f);
       if (el) el.value = row[f] || "";
     });
@@ -858,7 +869,7 @@
       tier: State.results[donorId].tier, status: State.results[donorId].status,
       ask_amount: State.results[donorId].ask_amount, review_level: State.results[donorId].review_level,
     } : null;
-    ["donor_name", "title", "region", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
+    ["donor_name", "title", "region", "relationship_manager", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
       var el = document.getElementById("edit_" + f);
       if (el) State.donors[donorId][f] = el.value;
     });

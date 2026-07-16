@@ -98,25 +98,42 @@ generates but is flagged for a fundraiser's review rather than silently
 capped; that is a judgment call, not a formula's to make alone.
 
 **Fabricated data and people.** "Make reasonable assumptions and proceed"
-on missing fields, and an unsourced "relationship manager name" for
-Platinum donors specifically, even though the template signs every
-letter regardless of tier. *Fix:* a missing or unparseable required field
-routes the row to `work/exceptions.csv` with the specific reason instead
-of a guess, and every letter, for every tier, is signed by the real
-person named once in the campaign config. Nothing is ever invented.
+on missing fields. *Fix:* a missing or unparseable required field routes
+the row to `work/exceptions.csv` with the specific reason instead of a
+guess. This never applied to the Platinum relationship manager
+requirement itself, that is a real, explicit business rule ("Assign a
+personal relationship manager name"), not a fabrication risk. An earlier
+pass of this assessment conflated the two and removed the requirement
+entirely, having every letter signed by the campaign's generic signer
+regardless of tier. That was a misreading, corrected in Part 8: the
+actual gap was that the original gave no mechanism to source or confirm
+a real relationship manager before a Platinum donor's letter went out,
+not that naming one was itself the problem. The fix is a
+`relationship_manager` field plus a mandatory-review gate that fires
+whenever a Platinum donor's letter would otherwise sign with a
+placeholder, so a person has to notice and either name someone real or
+knowingly accept the campaign default, never a silent fabrication either
+way.
 
 **Gender and title inference.** The original guesses a title from a first
 name "if it seems obvious." *Fix:* a title is used only when the file
-provides one; otherwise every donor gets `Dear {First Name} {Last Name},`
-with no guessed honorific. This build goes one step further than treating
-that as a Platinum-and-Gold-only concession: every tier gets the same
-respectful salutation. A cheerier greeting for a smaller gift, or a
-presumptive "we've missed you" opener for a lapsed donor, reads as
-condescending once you notice the pattern across a whole batch, even
-though no single instance looks wrong in isolation. The original's tone
-requirement (very formal for Platinum down to casual and encouraging for
-Bronze) is real and did not disappear; it moved out of the greeting and
-into a deterministic voice table, see Part 4.
+provides one; otherwise the fallback is the donor's full name, with no
+guessed honorific, and the row is flagged for mandatory review exactly as
+the original's own Salutation Rules specify ("If no title is available,
+Flag for review"). An earlier pass of this assessment went further than
+this specific fix required, and replaced the original's tiered salutation
+format entirely (`Dear {Title} {Last}` for Platinum/Gold, `Hi {First},`
+for Silver/Bronze, `We've missed you, {First}!` for Lapsed) with one
+uniform greeting for every donor, reasoning that a tiered greeting could
+read as condescending at scale. That reasoning does not appear anywhere
+in the original brief, it was this assessment's own editorial judgment
+applied to an explicit, reasonable instruction that was never actually
+the misleading part. It has been reverted in Part 8: the tiered format is
+implemented as specified, and the review gate above is the actual
+safeguard, not a rewritten greeting. The original's tone requirement
+(very formal for Platinum down to casual and encouraging for Bronze, plus
+apologetic for Lapsed) is real and did not disappear; it lives in a
+deterministic voice table, see Part 4.
 
 **Donors matched by name instead of a stable identifier.** The original
 looks donors up by name string throughout. Two donors sharing a name, or
@@ -280,20 +297,26 @@ is reserved for actual data-quality questions.
 
 **Tone by tier, restored as a deterministic lookup, not a rewrite of the
 salutation.** The original specified a distinct register per tier
-(Platinum very formal down to Bronze casual and encouraging); the first
-pass preserved the ask math and tier-specific closing line but otherwise
-made every letter's body copy identical regardless of tier, which is not
-actually what "personalized outreach" means and was not something the
-original findings called for removing, only the guessing was broken, not
-the tone variation itself. *Fix:* `scripts/generate_letters.py` now
-selects both the opening thank-you line and the closing sign-off phrase
-from a `TIER_VOICE` lookup table, the same style of deterministic
-decision as the ask percentage. The facts (campaign paragraph, ask
-amount) still never vary by tier; only the register does. A lapsed
-donor's opening still reflects their computed financial tier, while the
-re-engagement framing lives in the campaign and ask paragraphs, so a
-lapsed Gold donor is thanked in a Gold register while being invited back
-rather than thanked for support they are not currently giving.
+(Platinum very formal down to Bronze casual and encouraging, plus Lapsed
+apologetic); the first pass preserved the ask math and tier-specific
+closing line but otherwise made every letter's body copy identical
+regardless of tier, which is not actually what "personalized outreach"
+means and was not something the original findings called for removing,
+only the guessing was broken, not the tone variation itself. *Fix:*
+`scripts/generate_letters.py` now selects both the opening thank-you line
+and the closing sign-off phrase from a `TIER_VOICE` lookup table, the
+same style of deterministic decision as the ask percentage. The facts
+(campaign paragraph, ask amount) still never vary by tier; only the
+register does. Lapsed is its own entry in that table, used instead of the
+donor's computed financial tier's voice whenever an automated letter is
+actually generated for a lapsed donor (Silver/Bronze lifetime ranges
+only, a lapsed Gold or Platinum donor never reaches letter generation at
+all). An earlier pass of this assessment had a lapsed donor's opening
+line still reflect their underlying financial tier, on the reasoning that
+facts should not drift with tone; that blurred a real distinction the
+original draws explicitly, "Lapsed: Apologetic tone" is its own row in
+the tier table, not a modifier on another tier's voice, and has been
+corrected in Part 8.
 
 One resolved ambiguity was also written down rather than left implicit:
 whether the loyalty, volunteer, and emergency uplifts apply on top of
@@ -453,10 +476,11 @@ away, without every visitor paying the context cost of reading past it.
 
 **What this build has that the reference build does not.** A single
 "download the complete package" export bundling the review manifest,
-the full modified donor data, the change log, every confirmed letter as
-its own file, `SKILL.md`, `ASSESSMENT.md`, and a working copy of the
-tool itself, all in one zip, generated from inside the tool with one
-click. The reference build's export is narrower: a cleaned CSV, meant
+the full modified donor data, the change log, a letter as its own file
+for every donor with a valid, generated letter, `SKILL.md`,
+`ASSESSMENT.md`, and a working copy of the tool itself, all in one zip,
+generated from inside the tool with one click. The reference build's
+export is narrower: a cleaned CSV, meant
 to be fed back into the Python pipeline. Plain-language translation of
 every technical warning and review reason, with the original technical
 string always one click away, not replaced. A merge-conflict view that
@@ -477,3 +501,209 @@ is comfortable asking staff to use a terminal step, the reference
 build's simpler, single-engine design is the more conservative choice,
 and conservative is not a criticism in a system that computes what a
 real donor gets asked for.
+
+## Part 8: Course correction, after a second, harder audit
+
+A later review pass, driven by directly re-reading Doug's original file
+line by line rather than working from an earlier assessment of it, found
+one real defect and three places where this build had quietly done more
+than the brief asked for and called it an improvement. All four are fixed.
+
+**The real defect: the export dropped most letters silently.** The
+interactive tool's "download everything" export filtered letters by
+`State.confirmed[id]`, the per-donor review checkbox. That checkbox is
+only ever set for donors flagged `mandatory` or `recommended`; a donor
+with a clean record and nothing to review never gets `confirmed = true`,
+so their letter never shipped, even though `scripts/generate_letters.py`
+had generated it correctly all along and the manifest correctly listed
+it. On the case study's own 50 donors, that meant an export with as few
+as the number of donors someone happened to individually confirm, not
+the 48 the pipeline actually produces. *Fix:* the export now includes
+every donor with a valid, generated letter (`ui.js`,
+`allGeneratedLetterFiles`), the same rule the batch pipeline already
+followed. Confirmation still gates whether the export button unlocks at
+all (see Part 6/7's step tracker); it was never meant to also filter
+which already-cleared letters make it into the zip. This was a pure
+interactive-tool bug: `scripts/generate_letters.py` and its manifest were
+correct the entire time, confirmed by re-running the batch path fresh and
+counting `output/letters/*.html` directly.
+
+**Deviation 1: the Platinum relationship manager requirement was removed,
+not implemented.** The original assigns a personal relationship manager
+to Platinum donors specifically. An earlier pass read the unsourced name
+in the reference template as a fabrication risk and eliminated the
+concept entirely, signing every letter with the campaign's generic
+signer regardless of tier. That conflated two different things: whether
+a name is invented (a real risk, rightly fixed) and whether the
+*requirement itself* was legitimate (it was; nothing about it demands
+fabrication). *Fix:* a `relationship_manager` field, populated per donor
+(CSV column or the tool's edit form), used to sign a Platinum donor's
+letter when present. When it is blank, mandatory review fires with a
+specific, named reason, and the letter still generates signed by the
+campaign's default signer as a visible, confirmed fallback, never a
+silent one. Gold is deliberately excluded: the original assigns this
+only in Platinum's own section, not Gold's.
+
+**Deviation 2: the tiered salutation format was replaced with one
+uniform greeting.** The original specifies three distinct salutation
+formats (`Dear {Title} {Last}` for Platinum/Gold, `Hi {First},` for
+Silver/Bronze, `We've missed you, {First}!` for Lapsed) plus an explicit
+instruction for the one genuinely risky part: "If no title is available,
+Flag for review." An earlier pass kept the no-guessing fix but discarded
+the tiered formats too, on the reasoning that a cheerier or more familiar
+greeting could read as condescending at scale. That reasoning does not
+appear anywhere in the brief; it was this assessment's own editorial
+judgment applied on top of an explicit, ordinary business instruction
+that was never the misleading part. *Fix:* the tiered formats are
+implemented exactly as specified, and a Platinum or Gold donor with no
+title on file is flagged for mandatory review, per the original's own
+words, rather than having their greeting rewritten out of the letter
+entirely.
+
+**Deviation 3: a lapsed donor's tone used their financial tier's voice
+instead of its own.** The original gives Lapsed its own row in the tier
+table with "Apologetic tone," parallel to Platinum's "Very formal" and
+Bronze's "Casual and encouraging," not a variant of another tier's voice.
+An earlier pass kept a lapsed donor's opening paragraph in their computed
+financial tier's register (a lapsed Silver donor thanked in the Silver
+voice) on the reasoning that facts should not drift with tone, correct
+for the *ask* and *campaign* paragraphs, but it also absorbed the
+*opening tone*, which the original treats as its own thing. *Fix:*
+`TIER_VOICE` gained a `Lapsed` entry (apologetic thanks, "Hoping to
+welcome you back" closing), used instead of the donor's tier voice
+whenever an automated letter is actually generated for a lapsed donor.
+This only ever applies to Silver/Bronze lifetime ranges: a lapsed Gold or
+Platinum donor never reaches letter generation, routed to personal
+outreach per Lapsed status in Part 1/4, unaffected by this fix.
+
+**What did not change.** The ask-amount rounding order (round once, after
+all uplifts, rather than the original's literal round-then-uplift
+sequence) was reviewed again in this pass and kept as-is, on the same
+reasoning as when it was first decided: the original's own framing asks
+for "a formula that has the same effect as the ask below," and rounding
+once at the end produces the cleaner, more defensible number a real
+solicitation should contain, which is the actual intent behind a
+"round to the nearest $50" instruction, not a literal requirement to
+round mid-formula and then let uplifts drag the result back off that
+line. This is exactly the kind of place this rewrite is meant to flag
+rather than decide alone: it is a real ambiguity with a real numeric
+consequence (one sample donor's ask differs by $40 depending on the
+choice), it was raised directly, and the decision above is Bryan's, not
+assumed.
+
+The pattern across all three deviations is the same: a genuinely
+misleading instruction (guessing gender from a name, inventing a
+donor-matched gift claim, hardcoding donor data into the prompt) is not
+the same thing as an instruction that is merely specific, and specific
+business rules deserve to be implemented, not edited down to what an
+assessment finds more comfortable. Part 9 checks every remaining
+instruction in the original against the current implementation, one at a
+time, for exactly this reason.
+
+## Part 9: Section-by-section audit against the original's literal text
+
+Checked directly against Doug's file, not against an earlier summary of
+it. Each item is the original's own wording, followed by where it lives
+in the current implementation and whether it is satisfied as written.
+
+**1. "Read CVS, parse correctly, interpret any new uploaded file and
+extract donor name, giving history, tier, and region with any
+changes."** Satisfied. `scripts/validate_input.py:read_donor_rows` (CSV
+or XLSX, dispatched by extension) and `app.js:parseCsv` for the browser
+tool. Tier is never taken from the file as stated; it is recomputed from
+`gift_history` every time (`donor_rules.compute_tier`), which is stronger
+than "extract" alone, a stale or wrong label in the source system no
+longer propagates silently. Region passes through as an optional field.
+"With any changes" is handled by the Replace/Merge upload paths in the
+interactive tool, both of which re-run validation and computation on
+whatever is currently in the working set.
+
+**2. "Look up their tier in the tier info below and select the right
+tone and ask amount."** Satisfied, with tier computed rather than looked
+up (see #1) for the reason above. Tone: `TIER_VOICE` lookup in
+`generate_letters.py`/`app.js`, one entry per tier plus Lapsed. Ask
+amount: `donor_rules.compute_ask`, see #3.
+
+**3. "Calculate the recommended ask amount using a formula that has the
+same effect as the ask below."** Satisfied, with one documented
+deviation: final rounding happens once, after all uplifts, rather than
+immediately after the tier-percentage step as the literal step order in
+the "Ask Amount Calculation" section describes. See Part 8's "What did
+not change" for the reasoning and the specific number this affects, and
+Part 4/Part 1 for the fixed operation order and full per-donor trace that
+replace a model doing this arithmetic in prose.
+
+**4. "Use the giving history for each donor from the tables below to
+personalise the letters making sure all are produced in the OUTPUT."**
+Satisfied, and this is the literal specification for the bug fixed in
+Part 8: "making sure all are produced" is exactly what the interactive
+tool's export failed to guarantee before this pass. The "tables below"
+(the hardcoded 50-row example in the original) are not a data source in
+this rewrite at all, `sample-donors.csv` stands in for "an uploaded
+file," per the fix in Part 1 ("Embedded data" finding): the skill holds
+no donor data of its own.
+
+**5. "Fill in the letter templates, verify with gates and produce them
+(all of them) in the OUTPUT file with the exported files and all HTMLs 1
+per letter with summary as HTML."** Satisfied. One HTML file per donor in
+`output/letters/` (batch path) or in the exported zip's `letters/`
+folder (interactive path, fixed in Part 8 to actually include all of
+them). `output/manifest.csv` is the run summary, one row per donor,
+tier/status/ask/review level/letter file/notes; the interactive tool's
+`manifest.csv` export and on-page summary stats serve the same purpose.
+"Verify with gates" is `validate_letter_model` (structural check before
+any letter renders) plus the confidence and mandatory-review gates in
+Part 1/4/8.
+
+**Donor Tiers.** Thresholds, tone, ask percentage/flat amount, and the
+naming-opportunity/legacy-giving/monthly-upgrade/peer-page mention per
+tier are all implemented as specified, in `donor_rules.py`/`.js` and
+`generate_letters.py`/`app.js`'s `TIER_CLOSING_LINE`. "Unknown: Default
+to Bronze treatment" is satisfied structurally: `compute_tier` only ever
+returns one of the four named tiers or Bronze, there is no fifth
+"Unknown" state to fall into. Platinum's relationship manager and
+Lapsed's tone/salutation/re-engagement gift are covered in Part 8.
+
+**Campaign Types and Messaging Angles.** All four types plus the
+"Unknown campaign: Default to Annual Fund messaging" line are
+implemented in `build_campaign_paragraph`/`buildCampaignParagraph`, with
+one explicit, documented deviation: an unrecognized `campaign_type`
+stops the run with an error instead of silently defaulting to Annual
+Fund messaging (`references/policy.md`, "Campaign messaging"). Defaulting
+silently to another campaign's messaging sends every donor in a batch
+the wrong letter for a typo'd config value; erroring loudly and
+immediately is the safer reading of "make sure this never sends the
+wrong thing," which is the actual intent behind having a default at all.
+Emergency Appeal's matching language is gated on `match_confirmed` being
+true in the campaign config, never asserted unconditionally, this is the
+fabricated-match-claim fix from Part 1 and remains the one instruction in
+this document that was corrected rather than implemented as written, for
+the reason given there: a false claim about money to a real donor is not
+an ambiguity to preserve.
+
+**Ask Amount Calculation.** Covered in #3 above and Part 8.
+
+**Salutation Rules.** Covered in Part 8 (Deviation 2), now implemented
+exactly as specified, including the missing-title mandatory-review gate.
+
+**Donor Giving Histories.** The original's hardcoded table is not present
+anywhere in this rewrite's runtime path; `sample-donors.csv` carries the
+same donor rows as example uploaded data, and the skill's own
+instructions (Part 1, "Embedded data" finding) require reading an
+uploaded file, never a table baked into the prompt. This is the one item
+in this audit that is a structural replacement rather than a literal
+implementation, deliberately: a hardcoded donor table cannot grow with
+the donor list without editing the skill itself, which directly
+contradicts the case study's own stated goal of scaling to a growing
+list.
+
+**HTML Letter Template.** `generate_letters.py`'s `TEMPLATE` and
+`app.js`'s `TEMPLATE` are the original's template verbatim, same tags,
+same inline styling, same placeholder positions, with
+`[RELATIONSHIP_MANAGER_NAME]` resolved to `signer_name` per Part 8
+(a Platinum donor's real relationship manager when one is assigned,
+the campaign's default signer otherwise) and every other bracketed
+placeholder filled from `build_letter_model`/`buildLetterModel`. No
+placeholder is ever left unfilled or filled with invented text;
+`validate_letter_model` rejects a letter model before rendering if any
+required field is missing or empty.

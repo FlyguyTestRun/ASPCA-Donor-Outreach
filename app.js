@@ -251,11 +251,41 @@
     }
     var volunteer = VOLUNTEER_YES.indexOf(volunteerRaw) !== -1;
 
+    var title = String(row.title || "").trim();
+    var relationshipManager = String(row.relationship_manager || "").trim();
+
+    // Platinum-only per the original ("Assign a personal relationship
+    // manager name" appears only in Platinum's section, not Gold's).
+    // Missing one does not block the letter, generateForDonor falls back
+    // to the campaign's default signer, it forces mandatory review so a
+    // fundraiser has to notice and either name someone real or knowingly
+    // accept the default before this donor can be part of an export.
+    // Skipped for a lapsed Platinum donor: computeAsk routes that record
+    // to personal outreach with no letter at all, so a note about who
+    // signs a letter that will never be generated is just noise.
+    if (computedTier === "Platinum" && !relationshipManager && !lapsed) {
+      mandatoryReasons.push("Platinum donor: no personal relationship manager assigned yet; the letter uses the campaign's default signer until a specific relationship manager is named for this donor");
+    }
+
+    // "If no title is available, Flag for review" (original salutation
+    // rules), scoped to the two tiers whose salutation format actually
+    // uses a title. The fallback itself (full name, never a guessed
+    // honorific) happens in buildSalutation; this is what makes that
+    // fallback something a person signs off on rather than a silent swap.
+    // Skipped when lapsed: a lapsed Platinum/Gold donor's salutation is
+    // "We've missed you, {First}!" regardless of title, and never gets a
+    // letter at all (routed to personal outreach), so a note about their
+    // salutation format is moot either way.
+    if ((computedTier === "Platinum" || computedTier === "Gold") && !title && !lapsed) {
+      mandatoryReasons.push("no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending");
+    }
+
     var record = {
       donor_id: donorId,
       donor_name: donorName,
-      title: String(row.title || "").trim(),
+      title: title,
       region: String(row.region || "").trim(),
+      relationship_manager: relationshipManager,
       gift_history: String(row.gift_history).trim(),
       largest_gift: computedLargest.toFixed(2),
       lifetime_total: computedLifetime.toFixed(2),
@@ -350,6 +380,12 @@
     Gold: { thanks: "On behalf of everyone at {charity}, I want to personally thank you for your generosity and your continued partnership with our work.", closing_phrase: "With gratitude" },
     Silver: { thanks: "On behalf of everyone at {charity}, thank you so much for your generosity and for being part of our community of supporters.", closing_phrase: "With thanks" },
     Bronze: { thanks: "On behalf of everyone at {charity}, thank you for your support. Every gift, no matter the size, helps make a real difference.", closing_phrase: "Thanks so much" },
+    // Lapsed is its own register per the original ("Apologetic tone"),
+    // used instead of the donor's computed financial tier's voice
+    // whenever an automated letter is actually generated for a lapsed
+    // donor (Silver/Bronze lifetime ranges only; lapsed Gold/Platinum
+    // never reaches this, routed to personal outreach in computeAsk).
+    Lapsed: { thanks: "On behalf of everyone at {charity}, I wanted to reach out personally. It has been a while since we last heard from you, and we have missed having you as part of our community.", closing_phrase: "Hoping to welcome you back" },
   };
 
   var TIER_CLOSING_LINE = {
@@ -402,15 +438,28 @@
     return ("Today, I would like to invite you to make a gift of $" + R.fmtMoney0(ask) + ". " + line).trim();
   }
 
+  // Per the original's Salutation Rules: Lapsed gets its own opener
+  // regardless of computed tier; Platinum/Gold use title + last name (full
+  // name if no title is on file, never a guessed honorific, flagged for
+  // review separately in validateRow); Silver/Bronze use first name only.
   function buildSalutation(donor) {
     var parts = R.splitName(donor.donor_name);
-    var title = donor.title;
-    if (title) return "Dear " + R.esc(title) + " " + R.esc(parts[1]) + ",";
-    return "Dear " + R.esc(parts[0]) + " " + R.esc(parts[1]) + ",";
+    var first = parts[0], last = parts[1];
+    if (donor.status === "lapsed") return "We've missed you, " + R.esc(first) + "!";
+    if (donor.tier === "Platinum" || donor.tier === "Gold") {
+      var title = donor.title;
+      if (title) return "Dear " + R.esc(title) + " " + R.esc(last) + ",";
+      return "Dear " + R.esc(first) + " " + R.esc(last) + ",";
+    }
+    return "Hi " + R.esc(first) + ",";
+  }
+
+  function voiceKey(donor) {
+    return donor.status === "lapsed" ? "Lapsed" : donor.tier;
   }
 
   function buildOpeningParagraph(donor, charityName) {
-    var voice = TIER_VOICE[donor.tier];
+    var voice = TIER_VOICE[voiceKey(donor)];
     var text = voice.thanks.replace("{charity}", R.esc(charityName));
     var lifetime = parseFloat(donor.lifetime_total);
     if (lifetime >= LIFETIME_MENTION_MINIMUM) {
@@ -420,6 +469,17 @@
   }
 
   function buildLetterModel(donor, config, letterDate) {
+    // A Platinum donor with a named relationship manager is signed by that
+    // person, not the campaign's generic signer: the point of "assign a
+    // personal relationship manager" is that the letter comes from a
+    // specific human this donor is meant to know. No relationship manager
+    // on file falls back to the normal campaign signer (never invented),
+    // and validateRow already forces mandatory review on that donor so the
+    // fallback is a visible, confirmed choice, not a silent one.
+    var manager = String(donor.relationship_manager || "").trim();
+    var useManager = donor.tier === "Platinum" && manager;
+    var signerName = useManager ? manager : config.signer_name;
+    var signerTitle = useManager ? "Personal Relationship Manager" : config.signer_title;
     return {
       donor_id: donor.donor_id,
       letter_date: letterDate,
@@ -427,9 +487,9 @@
       opening_paragraph: buildOpeningParagraph(donor, config.charity_name),
       campaign_paragraph: buildCampaignParagraph(donor, config),
       ask_paragraph: buildAskParagraph(donor, config),
-      closing_phrase: TIER_VOICE[donor.tier].closing_phrase,
-      signer_name: R.esc(config.signer_name),
-      signer_title: R.esc(config.signer_title),
+      closing_phrase: TIER_VOICE[voiceKey(donor)].closing_phrase,
+      signer_name: R.esc(signerName),
+      signer_title: R.esc(signerTitle),
       charity_name: R.esc(config.charity_name),
       donation_url: R.esc(config.donation_url),
     };

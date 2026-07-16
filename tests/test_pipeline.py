@@ -197,21 +197,95 @@ class IngestionParityTests(unittest.TestCase):
 
 class SalutationAndVoiceTests(unittest.TestCase):
     def test_no_title_means_full_name_not_a_guess(self):
-        donor = {"donor_name": "Elizabeth Warren", "title": ""}
+        # Platinum/Gold format ("Dear ...") applies; no title on file falls
+        # back to the full name rather than a guessed honorific. The row
+        # is separately flagged for mandatory review in validate_input.py.
+        donor = {"donor_name": "Elizabeth Warren", "title": "", "tier": "Gold", "status": "active"}
         salutation = generate_letters.build_salutation(donor)
         self.assertEqual(salutation, "Dear Elizabeth Warren,")
 
     def test_title_present_is_used_as_is(self):
-        donor = {"donor_name": "Robert Svensson", "title": "Dr."}
+        donor = {"donor_name": "Robert Svensson", "title": "Dr.", "tier": "Platinum", "status": "active"}
         salutation = generate_letters.build_salutation(donor)
         self.assertEqual(salutation, "Dear Dr. Svensson,")
 
+    def test_silver_bronze_use_first_name_only(self):
+        donor = {"donor_name": "Maria Yamamoto", "title": "", "tier": "Silver", "status": "active"}
+        self.assertEqual(generate_letters.build_salutation(donor), "Hi Maria,")
+
+    def test_lapsed_gets_the_original_missed_you_opener(self):
+        # Per the original's literal Salutation Rules, and overrides the
+        # donor's own computed tier's format (a lapsed donor who happens
+        # to be Silver by lifetime giving still gets this, not "Hi").
+        donor = {"donor_name": "Michael Torres", "title": "", "tier": "Silver", "status": "lapsed"}
+        self.assertEqual(generate_letters.build_salutation(donor), "We've missed you, Michael!")
+
     def test_tone_actually_differs_by_tier(self):
         platinum = generate_letters.build_opening_paragraph(
-            {"tier": "Platinum", "lifetime_total": "100000"}, "ASPCA")
+            {"tier": "Platinum", "status": "active", "lifetime_total": "100000"}, "ASPCA")
         bronze = generate_letters.build_opening_paragraph(
-            {"tier": "Bronze", "lifetime_total": "100"}, "ASPCA")
+            {"tier": "Bronze", "status": "active", "lifetime_total": "100"}, "ASPCA")
         self.assertNotEqual(platinum, bronze)
+
+    def test_lapsed_gets_apologetic_voice_not_underlying_tier_voice(self):
+        # A lapsed donor computed as Silver by lifetime total does not get
+        # the "friendly" Silver voice; Lapsed's own apologetic register
+        # applies instead, matching the original's "Apologetic tone".
+        lapsed = generate_letters.build_opening_paragraph(
+            {"tier": "Silver", "status": "lapsed", "lifetime_total": "1800"}, "ASPCA")
+        active_silver = generate_letters.build_opening_paragraph(
+            {"tier": "Silver", "status": "active", "lifetime_total": "1800"}, "ASPCA")
+        self.assertNotEqual(lapsed, active_silver)
+        self.assertIn("missed", lapsed.lower())
+
+
+class RelationshipManagerGateTests(unittest.TestCase):
+    def test_platinum_missing_manager_forces_mandatory_review(self):
+        row = {
+            "donor_id": "D999", "donor_name": "Test Platinum",
+            "gift_history": "2023:60000",
+        }
+        record, reasons, mismatches = validate_input.validate_row(row, as_of_year=2024)
+        self.assertEqual(record["tier"], "Platinum")
+        self.assertIn("relationship manager", record["mandatory_reasons"])
+
+    def test_gold_does_not_require_a_manager(self):
+        # The original assigns this only in Platinum's section, not Gold's.
+        row = {
+            "donor_id": "D998", "donor_name": "Test Gold",
+            "gift_history": "2023:15000",
+        }
+        record, reasons, mismatches = validate_input.validate_row(row, as_of_year=2024)
+        self.assertEqual(record["tier"], "Gold")
+        self.assertNotIn("relationship manager", record["mandatory_reasons"])
+
+    def test_manager_present_is_used_as_the_signer(self):
+        donor = {
+            "tier": "Platinum", "status": "active", "relationship_manager": "Pat Nguyen",
+            "donor_id": "D999", "donor_name": "Test Platinum", "title": "", "lifetime_total": "60000",
+            "streak": "0", "ask_amount": "24000",
+        }
+        config = {
+            "charity_name": "ASPCA", "signer_name": "Jordan Ellis", "signer_title": "Director",
+            "campaign_type": "annual_fund", "donation_url": "https://x.org/donate", "match_confirmed": False,
+        }
+        model = generate_letters.build_letter_model(donor, config, "June 30, 2024")
+        self.assertEqual(model["signer_name"], "Pat Nguyen")
+        self.assertEqual(model["signer_title"], "Personal Relationship Manager")
+
+    def test_manager_absent_falls_back_to_campaign_signer(self):
+        donor = {
+            "tier": "Platinum", "status": "active", "relationship_manager": "",
+            "donor_id": "D999", "donor_name": "Test Platinum", "title": "", "lifetime_total": "60000",
+            "streak": "0", "ask_amount": "24000",
+        }
+        config = {
+            "charity_name": "ASPCA", "signer_name": "Jordan Ellis", "signer_title": "Director",
+            "campaign_type": "annual_fund", "donation_url": "https://x.org/donate", "match_confirmed": False,
+        }
+        model = generate_letters.build_letter_model(donor, config, "June 30, 2024")
+        self.assertEqual(model["signer_name"], "Jordan Ellis")
+        self.assertEqual(model["signer_title"], "Director")
 
 
 class GivingStreakTests(unittest.TestCase):

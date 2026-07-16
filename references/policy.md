@@ -26,8 +26,9 @@ matter which one a fundraiser exported.
 |---|---|---|
 | donor_id | yes | Stable unique identifier from the source system. This is the join key everywhere in the pipeline, specifically so two donors who happen to share a name can never collide the way a name-derived key can. |
 | donor_name | yes | Full name, for the salutation and letters only. Never used as a lookup key. |
-| title | no | Honorific exactly as the donor provided it. Never inferred. Blank is fine and expected. |
+| title | no | Honorific exactly as the donor provided it. Never inferred. Blank is fine and expected, but for a Platinum or Gold donor a blank title forces mandatory review (see Salutation below). |
 | region | no | Optional context field, not currently used in messaging. |
+| relationship_manager | no | The specific person assigned to this donor. Only meaningful for Platinum (the original assigns this in Platinum's section only, not Gold's); a blank value for a Platinum donor forces mandatory review (see Voice by tier below). |
 | gift_history | yes | Semicolon-separated `year:amount` pairs, e.g. `2019:500;2021:1200`. This is the only field the pipeline treats as ground truth. |
 | largest_gift, lifetime_total, last_gift_year | no | If present, checked against what `gift_history` computes. A disagreement is a warning, not a rejection: the computed value is always what gets used. |
 | tier | no | Stated tier, if the source system has one. Verified against the tier computed from `lifetime_total`, never trusted on its own. |
@@ -110,35 +111,79 @@ sanity-check.
 
 ## Salutation
 
-- Title present in the file: `Dear {Title} {Last Name},`
-- No title: `Dear {First Name} {Last Name},`
+The original's literal Salutation Rules are implemented as written, not
+softened:
+
+- **Lapsed** (any donor whose `status` is `lapsed`, i.e. still gets an
+  automated letter at all -- see Lapsed status above): `We've missed you,
+  {First Name}!`. This overrides tier-based format entirely: a lapsed
+  donor computed as Silver by lifetime giving still gets this opener, not
+  the Silver "Hi" format below.
+- **Platinum and Gold**: `Dear {Title} {Last Name},` when a title is on
+  file. When it is not, the fallback is the donor's full name, `Dear
+  {First Name} {Last Name},`, never a guessed honorific. This is the one
+  place the original's own wording is explicit about what to do instead
+  of guessing: "If no title is available, Flag for review." A blank title
+  on a Platinum or Gold donor forces mandatory review in
+  `validate_input.py` for exactly this reason, so the fallback is a
+  choice a fundraiser confirms, not a silent substitution.
+- **Silver and Bronze**: `Hi {First Name},`.
 - A title, and by extension gender, is never inferred from a first name.
-- Every donor gets the same respectful salutation regardless of tier.
-  Tone differences between tiers belong in the body of the letter, not in
-  how someone is addressed; a cheerier greeting for a smaller gift, or a
-  presumptive "we've missed you" opener for a lapsed donor, reads as
-  condescending at scale even when no single instance looks wrong.
+  That is the actual risk in the original's phrasing ("Elizabeth is
+  probably Ms."), not the tiered format itself, and it is the only part
+  of the original salutation instructions this rewrite changes rather
+  than implements directly.
+
+An earlier pass of this rewrite replaced all of the above with one
+uniform, gender-neutral salutation for every donor, reasoning that a
+tiered greeting or a presumptive "we've missed you" opener could read as
+condescending. That was editorial judgment applied to an explicit,
+reasonable business instruction that was never actually the misleading
+part of the brief, only the gender-guessing was. It has been reverted:
+the literal rules are now implemented, with the review gate above as the
+actual safeguard against a bad guess going out unreviewed.
 
 ## Voice by tier
 
 The original specified a distinct register per tier (Platinum very
 formal, Gold warm but professional, Silver friendly, Bronze casual and
-encouraging), and that is a real requirement, not decoration: a letter
-that reads identically to a first-time $50 donor and a $90,000 lifetime
-donor is not actually personalized. This is a lookup, in
-`scripts/generate_letters.py`'s `TIER_VOICE` table, the same kind of
-deterministic decision as the ask percentage: one right answer per
-tier, applied by code, never improvised per letter.
+encouraging, Lapsed apologetic), and that is a real requirement, not
+decoration: a letter that reads identically to a first-time $50 donor
+and a $90,000 lifetime donor is not actually personalized. This is a
+lookup, in `scripts/generate_letters.py`'s `TIER_VOICE` table, the same
+kind of deterministic decision as the ask percentage: one right answer
+per register, applied by code, never improvised per letter.
 
-Two lines vary by tier: the opening thank-you sentence, and the closing
-sign-off phrase. Everything else in the letter (the salutation, the
-campaign paragraph, the specific ask) is governed by campaign type and
-the donor's own data, not by tier, so that facts never drift with tone.
-A lapsed donor's opening line still reflects their computed financial
-tier; the re-engagement framing lives in the campaign and ask
-paragraphs instead, so a lapsed Gold donor is thanked in a Gold
-register while being invited back rather than thanked for ongoing
-support they have not given.
+Lapsed is its own register in this table, used instead of the donor's
+computed financial tier's voice whenever an automated letter is actually
+generated for a lapsed donor (only ever Silver or Bronze lifetime ranges;
+a lapsed Gold or Platinum donor never reaches letter generation at all,
+routed to personal outreach per Lapsed status above). A lapsed donor
+computed as Silver by lifetime total is thanked in the apologetic Lapsed
+register, not the friendly Silver one, matching the original's "Lapsed:
+Apologetic tone" directly rather than blending it with their underlying
+tier's tone.
+
+Two lines vary by register: the opening thank-you sentence, and the
+closing sign-off phrase. Everything else in the letter (the campaign
+paragraph, the specific ask) is governed by campaign type and the
+donor's own data, not by tier, so that facts never drift with tone.
+
+**Platinum relationship manager.** The original assigns this only in
+Platinum's own section ("Assign a personal relationship manager name"),
+not Gold's. When a Platinum donor's `relationship_manager` field is set,
+that person signs the letter (`signer_name`/`signer_title` become their
+name and "Personal Relationship Manager") instead of the campaign's
+generic signer, since the entire point of naming one is that the letter
+comes from a specific human this donor is meant to know. When it is
+blank, the letter still generates, signed by the campaign's normal
+signer as a visible default, and `validate_input.py` forces mandatory
+review on that donor specifically for this reason (not just because
+Platinum is always mandatory anyway) so a fundraiser has to notice and
+either name someone real or knowingly accept the default. A relationship
+manager name is still never invented by the system itself, for any
+tier; assigning one is a human decision this gate exists to surface,
+not something the pipeline guesses at.
 
 ## Campaign messaging
 
@@ -169,8 +214,11 @@ is not already in this document or the campaign config.
 - Lifetime giving is mentioned in the opening paragraph only when it is
   $500 or more. Thanking someone for "incredible generosity" of $75 reads
   as sarcasm.
-- Every letter closes with the real signer named in the campaign config.
-  A "relationship manager" name is never invented, for any tier.
+- Every letter closes with a real, named signer: the campaign's signer by
+  default, or a Platinum donor's own assigned relationship manager when
+  one is on file (see Voice by tier above). Neither is ever invented by
+  the system; a missing relationship manager falls back to the campaign
+  signer visibly, under mandatory review, rather than generating a name.
 - All donor-derived text is HTML-escaped before rendering.
 
 ## Review gates
@@ -195,10 +243,23 @@ judgment one: the donor is Platinum tier; the source file's stated tier
 disagreed with the computed one (the source system is out of sync with
 what this run is about to send, worth a heads-up regardless of how
 confident the pipeline is in its own math); the computed ask exceeds
-the donor's largest single gift; or the donor is a lapsed Gold or
-Platinum major donor routed to personal outreach instead of a letter.
-A record can have a perfect data-quality score and still be mandatory
-for one of these reasons, on purpose.
+the donor's largest single gift; the donor is a lapsed Gold or
+Platinum major donor routed to personal outreach instead of a letter;
+a Platinum or Gold donor has no title on file, so their salutation used
+the full-name fallback instead of `Dear {Title} {Last}`; or a Platinum
+donor has no relationship manager assigned, so their letter is signed
+by the campaign's default signer instead of a named person. A record
+can have a perfect data-quality score and still be mandatory for one of
+these reasons, on purpose.
+
+In practice, with the sample data as shipped (no `title` or
+`relationship_manager` populated for any donor), essentially every
+Platinum and Gold donor lands in mandatory review on the first run,
+Platinum already always was, and now Gold joins it purely because of
+the blank title column. That is the correct behavior for a real,
+never-reviewed source file: it is a visible, honest signal that this
+data has never had a human's eyes on the fields these gates exist to
+check, not a bug in the gate.
 
 Nothing this skill produces is ever sent automatically; output is files
 for a fundraiser to review.

@@ -1,30 +1,30 @@
 donor_id,donor_name,tier,status,ask_amount,confidence,review_level,letter_file,notes,rules_version
 D001,Robert Svensson,Platinum,lapsed,,1.00,mandatory,,"lapsed Platinum donor: route to personal outreach, no automated letter",1.0.0
-D002,Earl Fontaine,Platinum,active,36100,1.00,mandatory,letters/D002.html,,1.0.0
+D002,Earl Fontaine,Platinum,active,36100,1.00,mandatory,letters/D002.html,Platinum donor: no personal relationship manager assigned yet; the letter uses the campaign's default signer until a specific relationship manager is named for this donor | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
 D003,Walter Adeyemi,Platinum,lapsed,,1.00,mandatory,,"lapsed Platinum donor: route to personal outreach, no automated letter",1.0.0
-D004,Ralph Osei-Bonsu,Platinum,active,35300,1.00,mandatory,letters/D004.html,,1.0.0
-D005,Victor Ambrosius,Platinum,active,22000,1.00,mandatory,letters/D005.html,,1.0.0
-D006,James Whitfield,Gold,active,3100,1.00,none,letters/D006.html,,1.0.0
-D007,Dorothy Callahan,Gold,active,950,1.00,none,letters/D007.html,,1.0.0
-D008,Deborah Sorenson,Gold,active,1750,1.00,none,letters/D008.html,,1.0.0
-D009,Angela Petersen,Gold,active,1400,1.00,none,letters/D009.html,,1.0.0
-D010,Grace Thornton,Gold,active,1100,1.00,none,letters/D010.html,,1.0.0
-D011,Linda Petrov,Gold,active,4150,1.00,none,letters/D011.html,,1.0.0
-D012,Helen Magnusson,Gold,active,3000,1.00,none,letters/D012.html,,1.0.0
-D013,Maria Yamamoto,Gold,active,2250,1.00,none,letters/D013.html,,1.0.0
-D014,Emma Bergstrom,Gold,active,2200,1.00,none,letters/D014.html,,1.0.0
-D015,Nora Bergqvist,Gold,active,3250,1.00,none,letters/D015.html,,1.0.0
-D016,Nancy Okafor,Gold,active,1900,1.00,none,letters/D016.html,,1.0.0
-D017,Vera Johansson,Gold,active,2250,1.00,none,letters/D017.html,,1.0.0
+D004,Ralph Osei-Bonsu,Platinum,active,35300,1.00,mandatory,letters/D004.html,Platinum donor: no personal relationship manager assigned yet; the letter uses the campaign's default signer until a specific relationship manager is named for this donor | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D005,Victor Ambrosius,Platinum,active,22000,1.00,mandatory,letters/D005.html,Platinum donor: no personal relationship manager assigned yet; the letter uses the campaign's default signer until a specific relationship manager is named for this donor | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D006,James Whitfield,Gold,active,3100,1.00,mandatory,letters/D006.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D007,Dorothy Callahan,Gold,active,950,1.00,mandatory,letters/D007.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D008,Deborah Sorenson,Gold,active,1750,1.00,mandatory,letters/D008.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D009,Angela Petersen,Gold,active,1400,1.00,mandatory,letters/D009.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D010,Grace Thornton,Gold,active,1100,1.00,mandatory,letters/D010.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D011,Linda Petrov,Gold,active,4150,1.00,mandatory,letters/D011.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D012,Helen Magnusson,Gold,active,3000,1.00,mandatory,letters/D012.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D013,Maria Yamamoto,Gold,active,2250,1.00,mandatory,letters/D013.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D014,Emma Bergstrom,Gold,active,2200,1.00,mandatory,letters/D014.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D015,Nora Bergqvist,Gold,active,3250,1.00,mandatory,letters/D015.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D016,Nancy Okafor,Gold,active,1900,1.00,mandatory,letters/D016.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
+D017,Vera Johansson,Gold,active,2250,1.00,mandatory,letters/D017.html,no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
 D018,Margaret Alcott,Silver,active,250,1.00,none,letters/D018.html,,1.0.0
 D019,Harold Mensah,Silver,active,350,1.00,none,letters/D019.html,,1.0.0
 D020,Barbara Jensen,Silver,active,350,1.00,none,letters/D020.html,,1.0.0
 D021,Betty Nakagawa,Silver,active,400,1.00,none,letters/D021.html,,1.0.0
-D022,Ada Yamamoto-Pierce,Gold,active,1500,0.90,mandatory,letters/D022.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending,1.0.0
+D022,Ada Yamamoto-Pierce,Gold,active,1500,0.90,mandatory,letters/D022.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
 D023,Claire Oduya,Silver,active,600,1.00,none,letters/D023.html,,1.0.0
-D024,Ruth Andersen,Gold,active,2050,0.90,mandatory,letters/D024.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending,1.0.0
+D024,Ruth Andersen,Gold,active,2050,0.90,mandatory,letters/D024.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
 D025,Janet Okonkwo,Silver,active,600,1.00,none,letters/D025.html,,1.0.0
-D026,Shirley Magnusdottir,Gold,active,2050,0.90,mandatory,letters/D026.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending,1.0.0
+D026,Shirley Magnusdottir,Gold,active,2050,0.90,mandatory,letters/D026.html,tier corrected from 'Silver' to 'Gold': verify against the source system before sending | no title on file for a Platinum/Gold donor: the salutation falls back to their full name (never a guessed honorific); confirm this is acceptable before sending,1.0.0
 D027,Owen Oduya,Silver,active,300,1.00,none,letters/D027.html,,1.0.0
 D028,Susan Nakamura,Silver,active,350,1.00,none,letters/D028.html,,1.0.0
 D029,Joe Iwamoto,Silver,active,300,1.00,none,letters/D029.html,,1.0.0

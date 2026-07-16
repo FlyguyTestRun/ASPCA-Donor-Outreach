@@ -194,6 +194,7 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
           <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="add_donor_name"></div>
           <div class="fieldwrap"><label class="field">Title (optional)</label><input type="text" id="add_title"></div>
           <div class="fieldwrap"><label class="field">Region (optional)</label><input type="text" id="add_region"></div>
+          <div class="fieldwrap"><label class="field">Personal relationship manager (Platinum donors only, optional)</label><input type="text" id="add_relationship_manager"></div>
           <div class="fieldwrap"><label class="field">Gift history (year:amount;year:amount)</label><input type="text" id="add_gift_history" placeholder="2022:500;2023:750"></div>
           <div class="fieldwrap"><label class="field">Volunteer</label>
             <select id="add_volunteer"><option>No</option><option>Yes</option></select></div>
@@ -250,10 +251,12 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
   </div>
   <p class="badge-empty" id="exportGateMsg">Load donor data above to begin.</p>
   <p class="badge-empty">One zip: the review manifest, the full modified donor data, the change log,
-  every confirmed letter as its own file, <code>SKILL.md</code>, <code>ASSESSMENT.md</code>, and a
-  working copy of this exact page you can reopen and rerun. This is the same zip a fundraiser gets
-  and the same one this case study is submitted with; there is no separate version. Nothing generates
-  outbound mail; these are files for a fundraiser to review and send from their own system.</p>
+  a letter as its own file for every donor with a valid, generated letter (not only the ones you
+  individually confirmed, confirmation gates whether this button unlocks at all, not which letters
+  ship once it does), <code>SKILL.md</code>, <code>ASSESSMENT.md</code>, and a working copy of this
+  exact page you can reopen and rerun. This is the same zip a fundraiser gets and the same one this
+  case study is submitted with; there is no separate version. Nothing generates outbound mail; these
+  are files for a fundraiser to review and send from their own system.</p>
   <p class="badge-empty">Next run: on a fresh copy of this page, use "Replace working set with a new
   file" above with the <code>donor-data-modified.csv</code> from this zip as your starting data, then
   use "Merge in additional donors" to bring in whatever updated list you have. Any donor ID present in
@@ -298,6 +301,7 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
       <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="edit_donor_name"></div>
       <div class="fieldwrap"><label class="field">Title</label><input type="text" id="edit_title"></div>
       <div class="fieldwrap"><label class="field">Region</label><input type="text" id="edit_region"></div>
+      <div class="fieldwrap"><label class="field">Personal relationship manager (Platinum donors only)</label><input type="text" id="edit_relationship_manager"></div>
       <div class="fieldwrap"><label class="field">Gift history</label><textarea id="edit_gift_history"></textarea></div>
       <div class="grid3">
         <div class="fieldwrap"><label class="field">Stated largest gift (optional)</label><input type="text" id="edit_largest_gift"></div>
@@ -342,11 +346,12 @@ function UI_addDonor() {
     donor_name: document.getElementById('add_donor_name').value,
     title: document.getElementById('add_title').value,
     region: document.getElementById('add_region').value,
+    relationship_manager: document.getElementById('add_relationship_manager').value,
     gift_history: document.getElementById('add_gift_history').value,
     volunteer: document.getElementById('add_volunteer').value,
   });
   if (ok) {
-    ['add_donor_id','add_donor_name','add_title','add_region','add_gift_history'].forEach(function(id){
+    ['add_donor_id','add_donor_name','add_title','add_region','add_relationship_manager','add_gift_history'].forEach(function(id){
       document.getElementById(id).value = '';
     });
   }

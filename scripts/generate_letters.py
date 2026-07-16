@@ -81,6 +81,15 @@ TIER_VOICE = {
         "thanks": "On behalf of everyone at {charity}, thank you for your support. Every gift, no matter the size, helps make a real difference.",
         "closing_phrase": "Thanks so much",
     },
+    # Lapsed is its own register per the original ("Apologetic tone"), used
+    # instead of the donor's computed financial tier's voice whenever an
+    # automated letter is actually generated for a lapsed donor (Silver and
+    # Bronze lifetime ranges only; a lapsed Gold or Platinum donor never
+    # reaches this at all, routed to personal outreach in compute_ask).
+    "Lapsed": {
+        "thanks": "On behalf of everyone at {charity}, I wanted to reach out personally. It has been a while since we last heard from you, and we have missed having you as part of our community.",
+        "closing_phrase": "Hoping to welcome you back",
+    },
 }
 
 TIER_CLOSING_LINE = {
@@ -140,15 +149,29 @@ def build_ask_paragraph(donor: dict, config: dict) -> str:
 
 
 def build_salutation(donor: dict) -> str:
+    """Per the original's Salutation Rules: Lapsed gets its own opener
+    regardless of computed tier; Platinum/Gold use title + last name (full
+    name if no title is on file, never a guessed honorific, flagged for
+    review separately in validate_input.py); Silver/Bronze use first name
+    only."""
     first, last = rules.split_name(donor["donor_name"])
-    title = donor["title"]
-    if title:
-        return f"Dear {rules.esc(title)} {rules.esc(last)},"
-    return f"Dear {rules.esc(first)} {rules.esc(last)},"
+    if donor.get("status") == "lapsed":
+        return f"We've missed you, {rules.esc(first)}!"
+    tier = donor.get("tier")
+    if tier in ("Platinum", "Gold"):
+        title = donor["title"]
+        if title:
+            return f"Dear {rules.esc(title)} {rules.esc(last)},"
+        return f"Dear {rules.esc(first)} {rules.esc(last)},"
+    return f"Hi {rules.esc(first)},"
+
+
+def _voice_key(donor: dict) -> str:
+    return "Lapsed" if donor.get("status") == "lapsed" else donor["tier"]
 
 
 def build_opening_paragraph(donor: dict, charity_name: str) -> str:
-    voice = TIER_VOICE[donor["tier"]]
+    voice = TIER_VOICE[_voice_key(donor)]
     text = voice["thanks"].format(charity=rules.esc(charity_name))
     lifetime = float(donor["lifetime_total"])
     if lifetime >= LIFETIME_MENTION_MINIMUM:
@@ -157,6 +180,18 @@ def build_opening_paragraph(donor: dict, charity_name: str) -> str:
 
 
 def build_letter_model(donor: dict, config: dict, letter_date: str) -> dict:
+    # A Platinum donor with a named relationship manager is signed by that
+    # person, not the campaign's generic signer, the whole point of
+    # "assign a personal relationship manager" is that the letter comes
+    # from a specific human this donor is meant to know. No relationship
+    # manager on file falls back to the normal campaign signer (never
+    # invented), and validate_input.py already forces mandatory review on
+    # that donor so the fallback is a visible, confirmed choice, not a
+    # silent one.
+    manager = (donor.get("relationship_manager") or "").strip()
+    use_manager = donor["tier"] == "Platinum" and manager
+    signer_name = manager if use_manager else config["signer_name"]
+    signer_title = "Personal Relationship Manager" if use_manager else config["signer_title"]
     return {
         "donor_id": donor["donor_id"],
         "letter_date": letter_date,
@@ -164,9 +199,9 @@ def build_letter_model(donor: dict, config: dict, letter_date: str) -> dict:
         "opening_paragraph": build_opening_paragraph(donor, config["charity_name"]),
         "campaign_paragraph": build_campaign_paragraph(donor, config),
         "ask_paragraph": build_ask_paragraph(donor, config),
-        "closing_phrase": TIER_VOICE[donor["tier"]]["closing_phrase"],
-        "signer_name": rules.esc(config["signer_name"]),
-        "signer_title": rules.esc(config["signer_title"]),
+        "closing_phrase": TIER_VOICE[_voice_key(donor)]["closing_phrase"],
+        "signer_name": rules.esc(signer_name),
+        "signer_title": rules.esc(signer_title),
         "charity_name": rules.esc(config["charity_name"]),
         "donation_url": rules.esc(config["donation_url"]),
     }

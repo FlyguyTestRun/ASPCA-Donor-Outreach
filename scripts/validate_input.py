@@ -140,11 +140,46 @@ def validate_row(row: dict, as_of_year: int) -> tuple[dict | None, list[str], li
         warnings.append(f"unrecognized volunteer value {row.get('volunteer')!r}: treated as No")
     volunteer = volunteer_raw in VOLUNTEER_YES
 
+    title = (row.get("title") or "").strip()
+    relationship_manager = (row.get("relationship_manager") or "").strip()
+
+    # The original assigns a personal relationship manager only to Platinum
+    # ("Assign a personal relationship manager name"); Gold's own section
+    # says nothing about one, so this gate is Platinum-only, not Platinum
+    # and Gold. Missing one does not block the letter (the campaign's
+    # normal signer is used as a default in generate_letters.py); it forces
+    # mandatory review so a fundraiser has to notice and either assign a
+    # real person or knowingly accept the default before this can export.
+    # Skipped for a lapsed Platinum donor: compute_ask routes that record
+    # to personal outreach with no letter at all, so a note about who
+    # signs a letter that will never be generated is just noise.
+    if computed_tier == "Platinum" and not relationship_manager and not lapsed:
+        mandatory_reasons.append(
+            "Platinum donor: no personal relationship manager assigned yet; the letter uses the "
+            "campaign's default signer until a specific relationship manager is named for this donor"
+        )
+
+    # "If no title is available, Flag for review" (original salutation
+    # rules), scoped to the two tiers whose salutation actually uses a
+    # title (Dear {Title} {Last}). A missing title still gets a safe,
+    # non-guessed fallback (full name) in generate_letters.py; this is
+    # what makes that fallback something a person signs off on rather than
+    # a silent substitution. Skipped when lapsed: a lapsed Platinum/Gold
+    # donor's salutation is "We've missed you, {First}!" regardless of
+    # title, and never gets a letter at all (routed to personal outreach),
+    # so a note about their salutation format is moot either way.
+    if computed_tier in ("Platinum", "Gold") and not title and not lapsed:
+        mandatory_reasons.append(
+            "no title on file for a Platinum/Gold donor: the salutation falls back to their full "
+            "name (never a guessed honorific); confirm this is acceptable before sending"
+        )
+
     record = {
         "donor_id": donor_id,
         "donor_name": donor_name,
-        "title": (row.get("title") or "").strip(),
+        "title": title,
         "region": (row.get("region") or "").strip(),
+        "relationship_manager": relationship_manager,
         "gift_history": row["gift_history"].strip(),
         "largest_gift": f"{computed_largest:.2f}",
         "lifetime_total": f"{computed_lifetime:.2f}",
@@ -210,7 +245,7 @@ def run(input_path: Path, config_path: Path, workdir: Path) -> None:
     validated_path = workdir / "validated.csv"
     with validated_path.open("w", newline="", encoding="utf-8") as handle:
         fieldnames = list(validated[0].keys()) if validated else [
-            "donor_id", "donor_name", "title", "region", "gift_history",
+            "donor_id", "donor_name", "title", "region", "relationship_manager", "gift_history",
             "largest_gift", "lifetime_total", "last_gift_year", "volunteer",
             "tier", "status", "warnings", "mandatory_reasons", "rules_version",
         ]
