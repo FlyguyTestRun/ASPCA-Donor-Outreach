@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>charity-donor-outreach: interactive review tool</title>
+<style>
+:root {
+  --bg: #f7f6f3; --panel: #ffffff; --ink: #1f2420; --muted: #5b6560;
+  --line: #dfe3df; --accent: #2f6d4f; --accent-soft: #e6f0ea;
+  --warn: #9a6a1c; --warn-soft: #fbf1de; --bad: #a13a3a; --bad-soft: #fbe9e9;
+  --mono: "SF Mono", Consolas, "Courier New", monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#15181a; --panel:#1d2124; --ink:#e7ece8; --muted:#9aa39c;
+    --line:#333c37; --accent:#7fd6ac; --accent-soft:#1e2f27;
+    --warn:#e0b158; --warn-soft:#2c2417; --bad:#e08a8a; --bad-soft:#2c1c1c; }
+}
+:root[data-theme="dark"] { --bg:#15181a; --panel:#1d2124; --ink:#e7ece8; --muted:#9aa39c;
+  --line:#333c37; --accent:#7fd6ac; --accent-soft:#1e2f27;
+  --warn:#e0b158; --warn-soft:#2c2417; --bad:#e08a8a; --bad-soft:#2c1c1c; }
+:root[data-theme="light"] { --bg:#f7f6f3; --panel:#ffffff; --ink:#1f2420; --muted:#5b6560;
+  --line:#dfe3df; --accent:#2f6d4f; --accent-soft:#e6f0ea;
+  --warn:#9a6a1c; --warn-soft:#fbf1de; --bad:#a13a3a; --bad-soft:#fbe9e9; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--sans); }
+body { max-width: 1160px; margin: 0 auto; padding: 28px 20px 100px; line-height:1.5; }
+h1 { font-size: 1.55rem; margin: 0 0 6px; }
+h2 { font-size: 1.15rem; margin: 34px 0 12px; padding-top:14px; border-top:1px solid var(--line); }
+h3 { font-size: .98rem; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 0 0 18px; font-size: .92rem; }
+.pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.72rem; font-weight:600; }
+.pill.ok { background:var(--accent-soft); color:var(--accent); }
+.pill.warn { background:var(--warn-soft); color:var(--warn); }
+.pill.bad { background:var(--bad-soft); color:var(--bad); }
+.stat-row, #summaryStats { display:flex; flex-wrap:wrap; gap:8px; margin: 12px 0; }
+.stat { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:104px; flex:1; }
+.stat .num { font-size:1.3rem; font-weight:700; }
+.stat .label { font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin:14px 0; }
+.ready-banner { font-weight:600; padding: 12px 16px; }
+.ready-banner.ok { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.ready-banner.warn { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.compare { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin: 8px 0; }
+.compare .orig, .compare .now { border-radius:10px; padding:8px 12px; font-size:.85rem; }
+.compare .orig { background:var(--bad-soft); border:1px solid var(--bad); }
+.compare .now { background:var(--accent-soft); border:1px solid var(--accent); }
+.compare .tag { font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; font-weight:700; opacity:.75; display:block; margin-bottom:3px; }
+table { width:100%; border-collapse:collapse; font-size:.84rem; }
+th, td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align: middle; }
+th { color:var(--muted); font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+tr.row.needs-attention { background: var(--warn-soft); }
+button { font-family: inherit; }
+button.primary, .btnrow button:not(.link) { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:.85rem; }
+button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:.85rem; }
+button.link { background:none; border:none; color:var(--accent); cursor:pointer; padding:2px 4px; font-size:.82rem; text-decoration:underline; }
+input[type=search], input[type=text], input[type=date], input[type=number], input[type=file], textarea, select {
+  width:100%; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:.86rem; font-family:inherit;
+}
+textarea { min-height: 60px; font-family: var(--mono); font-size: .8rem; }
+.controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px 16px; }
+.grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px 16px; }
+@media (max-width: 760px) { .grid2, .grid3, .compare { grid-template-columns: 1fr; } }
+label.field { display:block; font-size:.76rem; color:var(--muted); margin-bottom:3px; }
+.fieldwrap { margin-bottom: 10px; }
+.btnrow { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
+.modal.open { display:flex; }
+.modal-frame { background:var(--panel); color:var(--ink); max-width:640px; width:100%; max-height:88vh; overflow:auto; border-radius:12px; padding:0; position:relative; border:1px solid var(--line); }
+.modal-frame .close-row { position:sticky; top:0; text-align:right; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+.modal-frame .body { padding: 14px 18px 18px; }
+.badge-empty { color:var(--muted); font-size:.8rem; }
+.toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:.85rem; opacity:0; pointer-events:none; transition: all .2s; max-width: 80vw; z-index: 100; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.bad { background: var(--bad); }
+.toast.warn { background: var(--warn); }
+.toast.ok { background: var(--accent); }
+.trace { font-family: var(--mono); font-size:.76rem; white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:6px; }
+.conflict-row { border:1px solid var(--warn); background: var(--warn-soft); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+footer { margin-top:50px; color:var(--muted); font-size:.78rem; border-top:1px solid var(--line); padding-top:16px; }
+a { color: var(--accent); }
+code { background:var(--accent-soft); padding:1px 5px; border-radius:5px; font-size:.88em; }
+details summary { cursor:pointer; font-weight:600; }
+.privacy-note { font-size: .82rem; color: var(--muted); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 14px; }
+.tour-nav { position:sticky; top:10px; z-index:30; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.tour-nav button { padding:6px 12px; font-size:.82rem; }
+.tour-caption { flex:1; min-width:180px; font-size:.84rem; color:var(--muted); }
+.spotlight { outline:3px solid var(--accent); outline-offset:4px; border-radius:10px; transition:outline-color .2s; scroll-margin-top:80px; }
+.progress-track { height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:10px 0 4px; }
+.progress-fill { height:100%; background:var(--accent); width:0%; transition:width .3s; }
+th[data-key] { cursor:pointer; user-select:none; }
+th[data-key]:hover { color:var(--ink); background:var(--accent-soft); }
+th[data-key]::after { content:"\21C5"; margin-left:5px; opacity:.5; font-size:.85em; }
+th[data-key].sort-asc::after { content:"\25B2"; opacity:1; color:var(--accent); }
+th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent); }
+.steps { display:flex; gap:0; margin:14px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
+.step { flex:1; padding:10px 12px; text-align:center; border-right:1px solid var(--line); cursor:pointer; font-size:.82rem; }
+.step:last-child { border-right:none; }
+.step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; background:var(--line); color:var(--muted); font-weight:700; font-size:.76rem; margin-right:6px; }
+.step.done .step-num { background:var(--accent); color:#fff; }
+.step.active { background:var(--accent-soft); }
+.step.active .step-num { background:var(--accent); color:#fff; }
+.step .step-badge { display:block; font-size:.72rem; color:var(--muted); margin-top:2px; }
+@media (max-width: 760px) { .steps { flex-direction:column; } .step { border-right:none; border-bottom:1px solid var(--line); } }
+#pageError { display:none; background:var(--bad-soft); border:1px solid var(--bad); color:var(--bad); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:.9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>charity-donor-outreach: interactive review tool</h1>
+  <p class="sub">This page is the program. Every rule from <code>references/policy.md</code>
+  runs right here in your browser (recompute tier, verify against gift history, calculate the
+  ask, pick the letter's register by tier, flag anything that needs a person). Nothing is
+  uploaded anywhere; there is no server behind this page.</p>
+  <p class="privacy-note">Loaded with the case study's sample data below. Replace it, merge in
+  more, or edit any donor, all without the data ever leaving this tab.</p>
+</header>
+
+<div id="pageError"></div>
+
+<div class="steps" id="stepsTracker">
+  <div class="step" data-jump="donordata"><span class="step-num">1</span>Data loaded</div>
+  <div class="step" data-jump="findings"><span class="step-num">2</span>Validated<span class="step-badge" id="stepBadge2"></span></div>
+  <div class="step" data-jump="table"><span class="step-num">3</span>Review &amp; correct<span class="step-badge" id="stepBadge3"></span></div>
+  <div class="step" data-jump="table"><span class="step-num">4</span>Sign off<span class="step-badge" id="stepBadge4"></span></div>
+  <div class="step" data-jump="export"><span class="step-num">5</span>Export</div>
+</div>
+
+<div class="tour-nav" id="tourNav">
+  <button class="secondary" onclick="UI.startTour()" id="tourStart">Start guided tour</button>
+  <button onclick="UI.tourStep(1)" style="display:none;" id="tourNext">Next</button>
+  <button class="secondary" onclick="UI.tourStep(-1)" style="display:none;" id="tourBack">Back</button>
+  <span class="tour-caption" id="tourCaption">A short, guided tour of what this page actually does, if you want it.</span>
+  <button class="secondary" onclick="UI.endTour()" style="display:none;" id="tourEnd">End tour</button>
+</div>
+
+<div class="panel ready-banner" id="readyBanner">Loading...</div>
+<div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+<div id="summaryStats"></div>
+
+<div id="findingsPanel" class="panel" data-tour="findings"></div>
+
+<details>
+  <summary>How letters sound by tier, and why (click to expand)</summary>
+  <div class="panel" id="tierVoicePanel" style="margin-top:10px;"></div>
+</details>
+
+<h2>Campaign settings</h2>
+<div class="panel" data-tour="settings">
+  <div class="grid3">
+    <div class="fieldwrap"><label class="field">Campaign type</label>
+      <select id="cfg_campaign_type">
+        <option value="annual_fund">annual_fund</option>
+        <option value="emergency_appeal">emergency_appeal</option>
+        <option value="capital_campaign">capital_campaign</option>
+        <option value="event_fundraiser">event_fundraiser</option>
+      </select></div>
+    <div class="fieldwrap"><label class="field">As-of date (reference date for lapsed / loyalty)</label><input type="date" id="cfg_as_of_date"></div>
+    <div class="fieldwrap"><label class="field">Charity name</label><input type="text" id="cfg_charity_name"></div>
+    <div class="fieldwrap"><label class="field">Donation URL</label><input type="text" id="cfg_donation_url"></div>
+    <div class="fieldwrap"><label class="field">Signer name</label><input type="text" id="cfg_signer_name"></div>
+    <div class="fieldwrap"><label class="field">Signer title</label><input type="text" id="cfg_signer_title"></div>
+    <div class="fieldwrap"><label class="field"><input type="checkbox" id="cfg_match_confirmed" style="width:auto;"> Match confirmed</label></div>
+    <div class="fieldwrap"><label class="field">Match sponsor (if confirmed)</label><input type="text" id="cfg_match_sponsor"></div>
+    <div class="fieldwrap"><label class="field">Match terms (if confirmed)</label><input type="text" id="cfg_match_terms"></div>
+    <div class="fieldwrap"><label class="field">Event registered count (event_fundraiser only)</label><input type="number" id="cfg_event_registered_count"></div>
+    <div class="fieldwrap"><label class="field">Re-engagement gift (lapsed donors, optional)</label><input type="text" id="cfg_reengagement_gift"></div>
+  </div>
+  <div class="btnrow"><button onclick="UI.applyConfigForm()">Apply settings</button></div>
+  <p class="badge-empty">Changing any setting here recomputes every donor and resets all confirmations, since the ask amount and letter text depend on these values.</p>
+</div>
+
+<h2>Donor data</h2>
+<div class="panel" data-tour="donordata">
+  <div class="grid3">
+    <div>
+      <label class="field">Replace working set with a new file</label>
+      <input type="file" accept=".csv" onchange="UI.handleFileUpload(this, 'replace')">
+      <p class="badge-empty">Starts over from this file.</p>
+    </div>
+    <div>
+      <label class="field">Merge in additional donors from a file</label>
+      <input type="file" accept=".csv" onchange="UI.handleFileUpload(this, 'merge')">
+      <p class="badge-empty">Adds to the current set. A donor_id already present is flagged as a conflict for you to resolve, never silently overwritten.</p>
+    </div>
+    <div>
+      <details>
+        <summary>Add one donor manually</summary>
+        <div style="margin-top:10px;">
+          <div class="fieldwrap"><label class="field">Donor ID (optional, auto-assigned if blank)</label><input type="text" id="add_donor_id"></div>
+          <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="add_donor_name"></div>
+          <div class="fieldwrap"><label class="field">Title (optional)</label><input type="text" id="add_title"></div>
+          <div class="fieldwrap"><label class="field">Region (optional)</label><input type="text" id="add_region"></div>
+          <div class="fieldwrap"><label class="field">Gift history (year:amount;year:amount)</label><input type="text" id="add_gift_history" placeholder="2022:500;2023:750"></div>
+          <div class="fieldwrap"><label class="field">Volunteer</label>
+            <select id="add_volunteer"><option>No</option><option>Yes</option></select></div>
+          <button class="primary" onclick="UI_addDonor()">Add donor</button>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div id="conflictPanel" class="panel" style="display:none;" data-tour="conflicts"></div>
+<div id="exceptionsPanel" class="panel" style="display:none;"></div>
+
+<h2>Donors</h2>
+<div class="controls" data-tour="table">
+  <input type="search" id="search" placeholder="Search donor name or ID...">
+  <select id="tierFilter"><option value="">All tiers</option><option>Platinum</option><option>Gold</option><option>Silver</option><option>Bronze</option></select>
+  <select id="reviewFilter"><option value="">All review levels</option><option>mandatory</option><option>recommended</option><option>none</option></select>
+  <button class="secondary" onclick="UI.bulkConfirmVisible()">Mark all currently-shown flagged donors reviewed</button>
+</div>
+<p class="badge-empty">The bulk button only affects donors matching your current search/filter above, and asks you to confirm the exact list by name before applying, so it can't be used to wave through donors you haven't actually looked at.</p>
+<div class="panel" style="overflow-x:auto;">
+<table>
+  <thead><tr>
+    <th data-key="donor_name">Donor</th><th data-key="tier">Tier</th><th data-key="status">Status</th><th data-key="ask_amount">Ask</th><th data-key="confidence">Confidence</th><th data-key="review_level">Review</th><th>Confirm</th><th>Actions</th>
+  </tr></thead>
+  <tbody id="donorTableBody"></tbody>
+</table>
+</div>
+
+<h2>Session</h2>
+<div class="panel">
+  <div class="btnrow">
+    <button class="secondary" onclick="UI.saveSession()">Save session (download)</button>
+    <label class="secondary" style="display:inline-block; cursor:pointer;">Load session
+      <input type="file" accept=".json" style="display:none;" onchange="UI.handleSessionUpload(this)"></label>
+  </div>
+  <p class="badge-empty">Nothing is saved automatically. A session file captures your current data,
+  settings, and confirmation decisions so you can resume later, entirely by your own explicit
+  download / upload.</p>
+</div>
+
+<h2>Change log</h2>
+<div class="panel">
+  <p class="badge-empty">Every load, edit, merge, manual add, removal, confirmation, and settings
+  change in this session, in plain language.</p>
+  <div id="changeLogPanel" style="max-height:220px; overflow-y:auto; font-size:.85rem;"></div>
+</div>
+
+<h2>Export</h2>
+<div class="panel" data-tour="export">
+  <div class="btnrow">
+    <button class="primary" id="exportBtn" disabled onclick="UI.exportEverything()">Extract results and save (.zip)</button>
+  </div>
+  <p class="badge-empty" id="exportGateMsg">Load donor data above to begin.</p>
+  <p class="badge-empty">One zip: the review manifest, the full modified donor data, the change log,
+  every confirmed letter as its own file, <code>SKILL.md</code>, <code>ASSESSMENT.md</code>, and a
+  working copy of this exact page you can reopen and rerun. This is the same zip a fundraiser gets
+  and the same one this case study is submitted with; there is no separate version. Nothing generates
+  outbound mail; these are files for a fundraiser to review and send from their own system.</p>
+  <p class="badge-empty">Next run: on a fresh copy of this page, use "Replace working set with a new
+  file" above with the <code>donor-data-modified.csv</code> from this zip as your starting data, then
+  use "Merge in additional donors" to bring in whatever updated list you have. Any donor ID present in
+  both is flagged as a conflict for you to resolve, never silently overwritten, and the next export
+  reflects the merged, up-to-date set.</p>
+</div>
+
+<h2>What changed from the original skill, and why</h2>
+<div class="panel">
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Tell the donor their gift will be matched, even if no match is confirmed.</div>
+    <div class="now"><span class="tag">Now</span>Matching language only appears if you check "Match confirmed" above and fill in the sponsor and terms.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Guess a title from the first name if no title is given.</div>
+    <div class="now"><span class="tag">Now</span>Full name, no honorific, if the file has no title. Never guessed.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Trust the stated Tier column.</div>
+    <div class="now"><span class="tag">Now</span>Tier is always recomputed from lifetime giving. A disagreement is flagged for mandatory review, not silently trusted either way.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Make reasonable assumptions on missing fields.</div>
+    <div class="now"><span class="tag">Now</span>A missing or unparseable required field excludes that donor and shows you why. Nothing is guessed.</div>
+  </div>
+  <p class="badge-empty">Full findings and reasoning: <code>ASSESSMENT.md</code>. Section-by-section walkthrough: <code>WALKTHROUGH.md</code>.</p>
+</div>
+
+<div class="modal" id="letterView">
+  <div class="modal-frame">
+    <div class="close-row"><button class="secondary" onclick="UI.closeLetter()">Close</button></div>
+    <div class="body" id="letterBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="editView">
+  <div class="modal-frame">
+    <div class="close-row"><button class="secondary" onclick="UI.closeEdit()">Close</button></div>
+    <div class="body">
+      <h3>Edit donor <span id="editDonorId" class="badge-empty"></span></h3>
+      <p class="badge-empty">Editing recomputes this donor immediately. If it was already confirmed, that confirmation is cleared.</p>
+      <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="edit_donor_name"></div>
+      <div class="fieldwrap"><label class="field">Title</label><input type="text" id="edit_title"></div>
+      <div class="fieldwrap"><label class="field">Region</label><input type="text" id="edit_region"></div>
+      <div class="fieldwrap"><label class="field">Gift history</label><textarea id="edit_gift_history"></textarea></div>
+      <div class="grid3">
+        <div class="fieldwrap"><label class="field">Stated largest gift (optional)</label><input type="text" id="edit_largest_gift"></div>
+        <div class="fieldwrap"><label class="field">Stated lifetime total (optional)</label><input type="text" id="edit_lifetime_total"></div>
+        <div class="fieldwrap"><label class="field">Stated last gift year (optional)</label><input type="text" id="edit_last_gift_year"></div>
+      </div>
+      <div class="fieldwrap"><label class="field">Stated tier (optional, cross-checked, never trusted alone)</label><input type="text" id="edit_tier"></div>
+      <div class="fieldwrap"><label class="field">Volunteer</label>
+        <select id="edit_volunteer"><option>No</option><option>Yes</option></select></div>
+      <div class="btnrow"><button class="primary" onclick="UI.saveEdit()">Save and recompute</button></div>
+      <div id="editImpact" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  Prepared by Bryan Shaw. This tool reimplements <code>references/policy.md</code> in
+  JavaScript (<code>donor_rules.js</code>, <code>app.js</code>); the same rules the Python
+  pipeline (<code>scripts/</code>) runs for agent-driven batch use. Both are checked against
+  each other by <code>tests/test_js_full_parity.js</code>. See <code>README.md</code> for how
+  the two front doors relate.
+</footer>
+
+<!-- BUILD:INLINE_SCRIPTS -->
+<script>
+// Belt-and-suspenders: this page has no server to log an error to, so an
+// uncaught exception must never just leave a blank or frozen screen with
+// no explanation. Every failure path ends up visible, in plain language,
+// right on the page.
+window.addEventListener('error', function (event) {
+  if (window.UI && UI.showPageError) UI.showPageError(event.message);
+});
+window.addEventListener('unhandledrejection', function (event) {
+  if (window.UI && UI.showPageError) UI.showPageError(String(event.reason && event.reason.message || event.reason));
+});
+
+function UI_addDonor() {
+  var ok = UI.addManualDonor({
+    donor_id: document.getElementById('add_donor_id').value,
+    donor_name: document.getElementById('add_donor_name').value,
+    title: document.getElementById('add_title').value,
+    region: document.getElementById('add_region').value,
+    gift_history: document.getElementById('add_gift_history').value,
+    volunteer: document.getElementById('add_volunteer').value,
+  });
+  if (ok) {
+    ['add_donor_id','add_donor_name','add_title','add_region','add_gift_history'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+  }
+}
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    UI.init(SAMPLE_DONORS_CSV, DEFAULT_CAMPAIGN_CONFIG);
+  } catch (err) {
+    UI.showPageError(err.message);
+  }
+});
+</script>
+</body>
+</html>

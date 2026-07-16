@@ -1,0 +1,2176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>charity-donor-outreach: interactive review tool</title>
+<style>
+:root {
+  --bg: #f7f6f3; --panel: #ffffff; --ink: #1f2420; --muted: #5b6560;
+  --line: #dfe3df; --accent: #2f6d4f; --accent-soft: #e6f0ea;
+  --warn: #9a6a1c; --warn-soft: #fbf1de; --bad: #a13a3a; --bad-soft: #fbe9e9;
+  --mono: "SF Mono", Consolas, "Courier New", monospace;
+  --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#15181a; --panel:#1d2124; --ink:#e7ece8; --muted:#9aa39c;
+    --line:#333c37; --accent:#7fd6ac; --accent-soft:#1e2f27;
+    --warn:#e0b158; --warn-soft:#2c2417; --bad:#e08a8a; --bad-soft:#2c1c1c; }
+}
+:root[data-theme="dark"] { --bg:#15181a; --panel:#1d2124; --ink:#e7ece8; --muted:#9aa39c;
+  --line:#333c37; --accent:#7fd6ac; --accent-soft:#1e2f27;
+  --warn:#e0b158; --warn-soft:#2c2417; --bad:#e08a8a; --bad-soft:#2c1c1c; }
+:root[data-theme="light"] { --bg:#f7f6f3; --panel:#ffffff; --ink:#1f2420; --muted:#5b6560;
+  --line:#dfe3df; --accent:#2f6d4f; --accent-soft:#e6f0ea;
+  --warn:#9a6a1c; --warn-soft:#fbf1de; --bad:#a13a3a; --bad-soft:#fbe9e9; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--sans); }
+body { max-width: 1160px; margin: 0 auto; padding: 28px 20px 100px; line-height:1.5; }
+h1 { font-size: 1.55rem; margin: 0 0 6px; }
+h2 { font-size: 1.15rem; margin: 34px 0 12px; padding-top:14px; border-top:1px solid var(--line); }
+h3 { font-size: .98rem; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 0 0 18px; font-size: .92rem; }
+.pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.72rem; font-weight:600; }
+.pill.ok { background:var(--accent-soft); color:var(--accent); }
+.pill.warn { background:var(--warn-soft); color:var(--warn); }
+.pill.bad { background:var(--bad-soft); color:var(--bad); }
+.stat-row, #summaryStats { display:flex; flex-wrap:wrap; gap:8px; margin: 12px 0; }
+.stat { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:104px; flex:1; }
+.stat .num { font-size:1.3rem; font-weight:700; }
+.stat .label { font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin:14px 0; }
+.ready-banner { font-weight:600; padding: 12px 16px; }
+.ready-banner.ok { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.ready-banner.warn { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.compare { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin: 8px 0; }
+.compare .orig, .compare .now { border-radius:10px; padding:8px 12px; font-size:.85rem; }
+.compare .orig { background:var(--bad-soft); border:1px solid var(--bad); }
+.compare .now { background:var(--accent-soft); border:1px solid var(--accent); }
+.compare .tag { font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; font-weight:700; opacity:.75; display:block; margin-bottom:3px; }
+table { width:100%; border-collapse:collapse; font-size:.84rem; }
+th, td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align: middle; }
+th { color:var(--muted); font-weight:600; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+tr.row.needs-attention { background: var(--warn-soft); }
+button { font-family: inherit; }
+button.primary, .btnrow button:not(.link) { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; font-size:.85rem; }
+button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:.85rem; }
+button.link { background:none; border:none; color:var(--accent); cursor:pointer; padding:2px 4px; font-size:.82rem; text-decoration:underline; }
+input[type=search], input[type=text], input[type=date], input[type=number], input[type=file], textarea, select {
+  width:100%; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font-size:.86rem; font-family:inherit;
+}
+textarea { min-height: 60px; font-family: var(--mono); font-size: .8rem; }
+.controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px 16px; }
+.grid3 { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px 16px; }
+@media (max-width: 760px) { .grid2, .grid3, .compare { grid-template-columns: 1fr; } }
+label.field { display:block; font-size:.76rem; color:var(--muted); margin-bottom:3px; }
+.fieldwrap { margin-bottom: 10px; }
+.btnrow { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+.modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
+.modal.open { display:flex; }
+.modal-frame { background:var(--panel); color:var(--ink); max-width:640px; width:100%; max-height:88vh; overflow:auto; border-radius:12px; padding:0; position:relative; border:1px solid var(--line); }
+.modal-frame .close-row { position:sticky; top:0; text-align:right; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
+.modal-frame .body { padding: 14px 18px 18px; }
+.badge-empty { color:var(--muted); font-size:.8rem; }
+.toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:.85rem; opacity:0; pointer-events:none; transition: all .2s; max-width: 80vw; z-index: 100; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.bad { background: var(--bad); }
+.toast.warn { background: var(--warn); }
+.toast.ok { background: var(--accent); }
+.trace { font-family: var(--mono); font-size:.76rem; white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:6px; }
+.conflict-row { border:1px solid var(--warn); background: var(--warn-soft); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+footer { margin-top:50px; color:var(--muted); font-size:.78rem; border-top:1px solid var(--line); padding-top:16px; }
+a { color: var(--accent); }
+code { background:var(--accent-soft); padding:1px 5px; border-radius:5px; font-size:.88em; }
+details summary { cursor:pointer; font-weight:600; }
+.privacy-note { font-size: .82rem; color: var(--muted); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 14px; }
+.tour-nav { position:sticky; top:10px; z-index:30; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.tour-nav button { padding:6px 12px; font-size:.82rem; }
+.tour-caption { flex:1; min-width:180px; font-size:.84rem; color:var(--muted); }
+.spotlight { outline:3px solid var(--accent); outline-offset:4px; border-radius:10px; transition:outline-color .2s; scroll-margin-top:80px; }
+.progress-track { height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:10px 0 4px; }
+.progress-fill { height:100%; background:var(--accent); width:0%; transition:width .3s; }
+th[data-key] { cursor:pointer; user-select:none; }
+th[data-key]:hover { color:var(--ink); background:var(--accent-soft); }
+th[data-key]::after { content:"\21C5"; margin-left:5px; opacity:.5; font-size:.85em; }
+th[data-key].sort-asc::after { content:"\25B2"; opacity:1; color:var(--accent); }
+th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent); }
+.steps { display:flex; gap:0; margin:14px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel); }
+.step { flex:1; padding:10px 12px; text-align:center; border-right:1px solid var(--line); cursor:pointer; font-size:.82rem; }
+.step:last-child { border-right:none; }
+.step .step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:999px; background:var(--line); color:var(--muted); font-weight:700; font-size:.76rem; margin-right:6px; }
+.step.done .step-num { background:var(--accent); color:#fff; }
+.step.active { background:var(--accent-soft); }
+.step.active .step-num { background:var(--accent); color:#fff; }
+.step .step-badge { display:block; font-size:.72rem; color:var(--muted); margin-top:2px; }
+@media (max-width: 760px) { .steps { flex-direction:column; } .step { border-right:none; border-bottom:1px solid var(--line); } }
+#pageError { display:none; background:var(--bad-soft); border:1px solid var(--bad); color:var(--bad); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:.9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>charity-donor-outreach: interactive review tool</h1>
+  <p class="sub">This page is the program. Every rule from <code>references/policy.md</code>
+  runs right here in your browser (recompute tier, verify against gift history, calculate the
+  ask, pick the letter's register by tier, flag anything that needs a person). Nothing is
+  uploaded anywhere; there is no server behind this page.</p>
+  <p class="privacy-note">Loaded with the case study's sample data below. Replace it, merge in
+  more, or edit any donor, all without the data ever leaving this tab.</p>
+</header>
+
+<div id="pageError"></div>
+
+<div class="steps" id="stepsTracker">
+  <div class="step" data-jump="donordata"><span class="step-num">1</span>Data loaded</div>
+  <div class="step" data-jump="findings"><span class="step-num">2</span>Validated<span class="step-badge" id="stepBadge2"></span></div>
+  <div class="step" data-jump="table"><span class="step-num">3</span>Review &amp; correct<span class="step-badge" id="stepBadge3"></span></div>
+  <div class="step" data-jump="table"><span class="step-num">4</span>Sign off<span class="step-badge" id="stepBadge4"></span></div>
+  <div class="step" data-jump="export"><span class="step-num">5</span>Export</div>
+</div>
+
+<div class="tour-nav" id="tourNav">
+  <button class="secondary" onclick="UI.startTour()" id="tourStart">Start guided tour</button>
+  <button onclick="UI.tourStep(1)" style="display:none;" id="tourNext">Next</button>
+  <button class="secondary" onclick="UI.tourStep(-1)" style="display:none;" id="tourBack">Back</button>
+  <span class="tour-caption" id="tourCaption">A short, guided tour of what this page actually does, if you want it.</span>
+  <button class="secondary" onclick="UI.endTour()" style="display:none;" id="tourEnd">End tour</button>
+</div>
+
+<div class="panel ready-banner" id="readyBanner">Loading...</div>
+<div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+<div id="summaryStats"></div>
+
+<div id="findingsPanel" class="panel" data-tour="findings"></div>
+
+<details>
+  <summary>How letters sound by tier, and why (click to expand)</summary>
+  <div class="panel" id="tierVoicePanel" style="margin-top:10px;"></div>
+</details>
+
+<h2>Campaign settings</h2>
+<div class="panel" data-tour="settings">
+  <div class="grid3">
+    <div class="fieldwrap"><label class="field">Campaign type</label>
+      <select id="cfg_campaign_type">
+        <option value="annual_fund">annual_fund</option>
+        <option value="emergency_appeal">emergency_appeal</option>
+        <option value="capital_campaign">capital_campaign</option>
+        <option value="event_fundraiser">event_fundraiser</option>
+      </select></div>
+    <div class="fieldwrap"><label class="field">As-of date (reference date for lapsed / loyalty)</label><input type="date" id="cfg_as_of_date"></div>
+    <div class="fieldwrap"><label class="field">Charity name</label><input type="text" id="cfg_charity_name"></div>
+    <div class="fieldwrap"><label class="field">Donation URL</label><input type="text" id="cfg_donation_url"></div>
+    <div class="fieldwrap"><label class="field">Signer name</label><input type="text" id="cfg_signer_name"></div>
+    <div class="fieldwrap"><label class="field">Signer title</label><input type="text" id="cfg_signer_title"></div>
+    <div class="fieldwrap"><label class="field"><input type="checkbox" id="cfg_match_confirmed" style="width:auto;"> Match confirmed</label></div>
+    <div class="fieldwrap"><label class="field">Match sponsor (if confirmed)</label><input type="text" id="cfg_match_sponsor"></div>
+    <div class="fieldwrap"><label class="field">Match terms (if confirmed)</label><input type="text" id="cfg_match_terms"></div>
+    <div class="fieldwrap"><label class="field">Event registered count (event_fundraiser only)</label><input type="number" id="cfg_event_registered_count"></div>
+    <div class="fieldwrap"><label class="field">Re-engagement gift (lapsed donors, optional)</label><input type="text" id="cfg_reengagement_gift"></div>
+  </div>
+  <div class="btnrow"><button onclick="UI.applyConfigForm()">Apply settings</button></div>
+  <p class="badge-empty">Changing any setting here recomputes every donor and resets all confirmations, since the ask amount and letter text depend on these values.</p>
+</div>
+
+<h2>Donor data</h2>
+<div class="panel" data-tour="donordata">
+  <div class="grid3">
+    <div>
+      <label class="field">Replace working set with a new file</label>
+      <input type="file" accept=".csv" onchange="UI.handleFileUpload(this, 'replace')">
+      <p class="badge-empty">Starts over from this file.</p>
+    </div>
+    <div>
+      <label class="field">Merge in additional donors from a file</label>
+      <input type="file" accept=".csv" onchange="UI.handleFileUpload(this, 'merge')">
+      <p class="badge-empty">Adds to the current set. A donor_id already present is flagged as a conflict for you to resolve, never silently overwritten.</p>
+    </div>
+    <div>
+      <details>
+        <summary>Add one donor manually</summary>
+        <div style="margin-top:10px;">
+          <div class="fieldwrap"><label class="field">Donor ID (optional, auto-assigned if blank)</label><input type="text" id="add_donor_id"></div>
+          <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="add_donor_name"></div>
+          <div class="fieldwrap"><label class="field">Title (optional)</label><input type="text" id="add_title"></div>
+          <div class="fieldwrap"><label class="field">Region (optional)</label><input type="text" id="add_region"></div>
+          <div class="fieldwrap"><label class="field">Gift history (year:amount;year:amount)</label><input type="text" id="add_gift_history" placeholder="2022:500;2023:750"></div>
+          <div class="fieldwrap"><label class="field">Volunteer</label>
+            <select id="add_volunteer"><option>No</option><option>Yes</option></select></div>
+          <button class="primary" onclick="UI_addDonor()">Add donor</button>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div id="conflictPanel" class="panel" style="display:none;" data-tour="conflicts"></div>
+<div id="exceptionsPanel" class="panel" style="display:none;"></div>
+
+<h2>Donors</h2>
+<div class="controls" data-tour="table">
+  <input type="search" id="search" placeholder="Search donor name or ID...">
+  <select id="tierFilter"><option value="">All tiers</option><option>Platinum</option><option>Gold</option><option>Silver</option><option>Bronze</option></select>
+  <select id="reviewFilter"><option value="">All review levels</option><option>mandatory</option><option>recommended</option><option>none</option></select>
+  <button class="secondary" onclick="UI.bulkConfirmVisible()">Mark all currently-shown flagged donors reviewed</button>
+</div>
+<p class="badge-empty">The bulk button only affects donors matching your current search/filter above, and asks you to confirm the exact list by name before applying, so it can't be used to wave through donors you haven't actually looked at.</p>
+<div class="panel" style="overflow-x:auto;">
+<table>
+  <thead><tr>
+    <th data-key="donor_name">Donor</th><th data-key="tier">Tier</th><th data-key="status">Status</th><th data-key="ask_amount">Ask</th><th data-key="confidence">Confidence</th><th data-key="review_level">Review</th><th>Confirm</th><th>Actions</th>
+  </tr></thead>
+  <tbody id="donorTableBody"></tbody>
+</table>
+</div>
+
+<h2>Session</h2>
+<div class="panel">
+  <div class="btnrow">
+    <button class="secondary" onclick="UI.saveSession()">Save session (download)</button>
+    <label class="secondary" style="display:inline-block; cursor:pointer;">Load session
+      <input type="file" accept=".json" style="display:none;" onchange="UI.handleSessionUpload(this)"></label>
+  </div>
+  <p class="badge-empty">Nothing is saved automatically. A session file captures your current data,
+  settings, and confirmation decisions so you can resume later, entirely by your own explicit
+  download / upload.</p>
+</div>
+
+<h2>Change log</h2>
+<div class="panel">
+  <p class="badge-empty">Every load, edit, merge, manual add, removal, confirmation, and settings
+  change in this session, in plain language.</p>
+  <div id="changeLogPanel" style="max-height:220px; overflow-y:auto; font-size:.85rem;"></div>
+</div>
+
+<h2>Export</h2>
+<div class="panel" data-tour="export">
+  <div class="btnrow">
+    <button class="primary" id="exportBtn" disabled onclick="UI.exportEverything()">Extract results and save (.zip)</button>
+  </div>
+  <p class="badge-empty" id="exportGateMsg">Load donor data above to begin.</p>
+  <p class="badge-empty">One zip: the review manifest, the full modified donor data, the change log,
+  every confirmed letter as its own file, <code>SKILL.md</code>, <code>ASSESSMENT.md</code>, and a
+  working copy of this exact page you can reopen and rerun. This is the same zip a fundraiser gets
+  and the same one this case study is submitted with; there is no separate version. Nothing generates
+  outbound mail; these are files for a fundraiser to review and send from their own system.</p>
+  <p class="badge-empty">Next run: on a fresh copy of this page, use "Replace working set with a new
+  file" above with the <code>donor-data-modified.csv</code> from this zip as your starting data, then
+  use "Merge in additional donors" to bring in whatever updated list you have. Any donor ID present in
+  both is flagged as a conflict for you to resolve, never silently overwritten, and the next export
+  reflects the merged, up-to-date set.</p>
+</div>
+
+<h2>What changed from the original skill, and why</h2>
+<div class="panel">
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Tell the donor their gift will be matched, even if no match is confirmed.</div>
+    <div class="now"><span class="tag">Now</span>Matching language only appears if you check "Match confirmed" above and fill in the sponsor and terms.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Guess a title from the first name if no title is given.</div>
+    <div class="now"><span class="tag">Now</span>Full name, no honorific, if the file has no title. Never guessed.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Trust the stated Tier column.</div>
+    <div class="now"><span class="tag">Now</span>Tier is always recomputed from lifetime giving. A disagreement is flagged for mandatory review, not silently trusted either way.</div>
+  </div>
+  <div class="compare">
+    <div class="orig"><span class="tag">Original</span>Make reasonable assumptions on missing fields.</div>
+    <div class="now"><span class="tag">Now</span>A missing or unparseable required field excludes that donor and shows you why. Nothing is guessed.</div>
+  </div>
+  <p class="badge-empty">Full findings and reasoning: <code>ASSESSMENT.md</code>. Section-by-section walkthrough: <code>WALKTHROUGH.md</code>.</p>
+</div>
+
+<div class="modal" id="letterView">
+  <div class="modal-frame">
+    <div class="close-row"><button class="secondary" onclick="UI.closeLetter()">Close</button></div>
+    <div class="body" id="letterBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="editView">
+  <div class="modal-frame">
+    <div class="close-row"><button class="secondary" onclick="UI.closeEdit()">Close</button></div>
+    <div class="body">
+      <h3>Edit donor <span id="editDonorId" class="badge-empty"></span></h3>
+      <p class="badge-empty">Editing recomputes this donor immediately. If it was already confirmed, that confirmation is cleared.</p>
+      <div class="fieldwrap"><label class="field">Full name</label><input type="text" id="edit_donor_name"></div>
+      <div class="fieldwrap"><label class="field">Title</label><input type="text" id="edit_title"></div>
+      <div class="fieldwrap"><label class="field">Region</label><input type="text" id="edit_region"></div>
+      <div class="fieldwrap"><label class="field">Gift history</label><textarea id="edit_gift_history"></textarea></div>
+      <div class="grid3">
+        <div class="fieldwrap"><label class="field">Stated largest gift (optional)</label><input type="text" id="edit_largest_gift"></div>
+        <div class="fieldwrap"><label class="field">Stated lifetime total (optional)</label><input type="text" id="edit_lifetime_total"></div>
+        <div class="fieldwrap"><label class="field">Stated last gift year (optional)</label><input type="text" id="edit_last_gift_year"></div>
+      </div>
+      <div class="fieldwrap"><label class="field">Stated tier (optional, cross-checked, never trusted alone)</label><input type="text" id="edit_tier"></div>
+      <div class="fieldwrap"><label class="field">Volunteer</label>
+        <select id="edit_volunteer"><option>No</option><option>Yes</option></select></div>
+      <div class="btnrow"><button class="primary" onclick="UI.saveEdit()">Save and recompute</button></div>
+      <div id="editImpact" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  Prepared by Bryan Shaw. This tool reimplements <code>references/policy.md</code> in
+  JavaScript (<code>donor_rules.js</code>, <code>app.js</code>); the same rules the Python
+  pipeline (<code>scripts/</code>) runs for agent-driven batch use. Both are checked against
+  each other by <code>tests/test_js_full_parity.js</code>. See <code>README.md</code> for how
+  the two front doors relate.
+</footer>
+
+<script>
+/* Embedded starting data and documents, generated from the canonical files. */
+var SAMPLE_DONORS_CSV = "donor_id,donor_name,title,tier,region,largest_gift,lifetime_total,last_gift_year,volunteer,gift_history\nD001,Robert Svensson,,Platinum,Northeast,50000,145000,2020,No,2010:25000;2013:30000;2016:40000;2020:50000\nD002,Earl Fontaine,,Platinum,Southeast,90000,275000,2022,Yes,2012:50000;2015:60000;2018:75000;2022:90000\nD003,Walter Adeyemi,,Platinum,Midwest,30000,75000,2020,No,2014:20000;2017:25000;2020:30000\nD004,Ralph Osei-Bonsu,,Platinum,West,80000,235000,2023,Yes,2013:40000;2016:50000;2019:65000;2023:80000\nD005,Victor Ambrosius,,Platinum,International,55000,165000,2021,No,2011:30000;2014:35000;2017:45000;2021:55000\nD006,James Whitfield,,Gold,Northeast,12000,35000,2022,Yes,2015:5000;2017:8000;2019:10000;2022:12000\nD007,Dorothy Callahan,,Gold,Southeast,3500,11000,2023,No,2020:2000;2021:2500;2022:3000;2023:3500\nD008,Deborah Sorenson,,Gold,Midwest,7000,22000,2022,No,2016:4000;2018:5000;2020:6000;2022:7000\nD009,Angela Petersen,,Gold,West,5500,13500,2021,No,2017:3500;2019:4500;2021:5500\nD010,Grace Thornton,,Gold,International,4000,13000,2023,No,2020:2500;2021:3000;2022:3500;2023:4000\nD011,Linda Petrov,,Gold,Northeast,15000,37500,2023,No,2019:10000;2021:12500;2023:15000\nD012,Helen Magnusson,,Gold,Southeast,12000,30000,2022,No,2018:8000;2020:10000;2022:12000\nD013,Maria Yamamoto,,Gold,Midwest,9000,22500,2022,No,2018:6000;2020:7500;2022:9000\nD014,Emma Bergstrom,,Gold,West,8000,19500,2023,No,2019:5000;2021:6500;2023:8000\nD015,Nora Bergqvist,,Gold,International,13000,33000,2022,No,2018:9000;2020:11000;2022:13000\nD016,Nancy Okafor,,Gold,Southeast,7500,18500,2021,No,2017:5000;2019:6000;2021:7500\nD017,Vera Johansson,,Gold,International,9000,24000,2021,No,2017:7000;2019:8000;2021:9000\nD018,Margaret Alcott,,Silver,Northeast,1500,4950,2023,No,2019:500;2020:750;2021:1000;2022:1200;2023:1500\nD019,Harold Mensah,,Silver,Southeast,1400,3600,2023,Yes,2021:1000;2022:1200;2023:1400\nD020,Barbara Jensen,,Silver,Midwest,2000,4500,2023,No,2021:1000;2022:1500;2023:2000\nD021,Betty Nakagawa,,Silver,West,2500,6000,2023,No,2021:1500;2022:2000;2023:2500\nD022,Ada Yamamoto-Pierce,,Silver,International,5000,17000,2023,Yes,2020:3500;2021:4000;2022:4500;2023:5000\nD023,Claire Oduya,,Silver,Northeast,3000,6500,2023,Yes,2018:1500;2019:2000;2023:3000\nD024,Ruth Andersen,,Silver,Southeast,7000,25000,2023,Yes,2019:3000;2020:4000;2021:5000;2022:6000;2023:7000\nD025,Janet Okonkwo,,Silver,Midwest,3000,7500,2023,Yes,2019:2000;2021:2500;2023:3000\nD026,Shirley Magnusdottir,,Silver,West,7000,22000,2023,Yes,2020:4000;2021:5000;2022:6000;2023:7000\nD027,Owen Oduya,,Silver,International,1200,3000,2023,Yes,2021:800;2022:1000;2023:1200\nD028,Susan Nakamura,,Silver,Northeast,1500,5000,2024,Yes,2020:500;2021:750;2022:1000;2023:1250;2024:1500\nD029,Joe Iwamoto,,Silver,West,1300,4050,2023,Yes,2020:750;2021:900;2022:1100;2023:1300\nD030,Michael Torres,,Lapsed,Northeast,700,1800,2019,No,2017:500;2018:600;2019:700\nD031,Charles Kimura,,Lapsed,Southeast,400,1200,2017,No,2015:400;2016:400;2017:400\nD032,Paul Achebe,,Lapsed,Midwest,300,900,2019,No,2017:300;2018:300;2019:300\nD033,Frank Watanabe,,Lapsed,West,350,1050,2018,No,2016:350;2017:350;2018:350\nD034,Lars Achebe-Nielsen,,Lapsed,International,400,1200,2017,No,2015:400;2016:400;2017:400\nD035,Thomas Bergmann,,Lapsed,Northeast,300,600,2015,No,2014:300;2015:300\nD036,Frank Dimitriou,,Lapsed,Southeast,200,600,2018,No,2016:200;2017:200;2018:200\nD037,Raymond Volkov,,Lapsed,Midwest,250,500,2020,No,2019:250;2020:250\nD038,Henry Obi,,Lapsed,West,200,350,2019,No,2018:150;2019:200\nD039,Felix Mensah-Bonsu,,Lapsed,International,300,600,2020,No,2019:300;2020:300\nD040,Patricia Huang,,Bronze,Northeast,250,450,2022,No,2021:200;2022:250\nD041,Brenda Kowalski,,Bronze,Southeast,150,150,2023,No,2023:150\nD042,Carol Eriksson,,Bronze,Midwest,100,100,2023,No,2023:100\nD043,Kathy Lindberg,,Bronze,West,125,125,2022,No,2022:125\nD044,Iris Kowalczyk,,Bronze,International,200,200,2023,No,2023:200\nD045,David Osei,,Bronze,Northeast,100,175,2023,No,2022:75;2023:100\nD046,George Nwosu,,Bronze,Southeast,75,125,2023,No,2022:50;2023:75\nD047,Samuel Lindqvist,,Bronze,Midwest,50,50,2022,No,2022:50\nD048,Jack Nkemdirim,,Bronze,West,50,50,2023,No,2023:50\nD049,Igor Volkov,,Bronze,International,75,75,2022,No,2022:75\nD050,Arthur Mwangi,,Bronze,Midwest,800,2600,2023,Yes,2020:500;2021:600;2022:700;2023:800\n";
+var DEFAULT_CAMPAIGN_CONFIG = {
+  "campaign_type": "annual_fund",
+  "as_of_date": "2024-06-30",
+  "charity_name": "ASPCA",
+  "donation_url": "https://www.aspca.org/donate",
+  "signer_name": "Jordan Ellis",
+  "signer_title": "Director of Development",
+  "match_confirmed": false,
+  "match_sponsor": "",
+  "match_terms": "",
+  "event_registered_count": null,
+  "reengagement_gift": ""
+};
+var SKILL_MD_TEXT = "---\nname: charity-donor-outreach\ndescription: >-\n  Use this skill when a user uploads a donor file and asks to generate\n  personalized outreach letters for a fundraising campaign.\n---\n\n# Charity Donor Outreach Letter Generator\n\nAn orchestrator, not a calculator: every rule with one right answer,\nincluding tone by tier, lives in code, tested outside this file, and\nruns at zero model cost regardless of how many donors are in the batch.\n`references/policy.md` is the full policy this pipeline implements; this\nfile only holds what changes what the agent does next.\n\n## Required inputs\n\n1. **Donor file** (CSV or XLSX), at minimum donor_id, donor_name,\n   gift_history. Full format in `references/policy.md`.\n   `sample-donors.csv` / `sample-donors.xlsx` are test fixtures, not a\n   data source.\n2. **Campaign config** (JSON): campaign_type, as_of_date, charity_name,\n   donation_url, signer_name, signer_title, match_confirmed (plus sponsor\n   and terms if true). Example at `references/campaign_config.example.json`.\n\nIf the donor file is uploaded without a campaign config, ask for the\nconfig; do not wait for both before engaging. Never fill in a charity\nname, donation URL, signer, date, or campaign type yourself.\n\n## Workflow\n\n### Step 1: Validate\n\n```\npython scripts/validate_input.py --input <donor_file.csv|.xlsx> --config <campaign.json>\n```\n\n(Use `python3` instead of `python` if that is what resolves on the host.)\n\nWrites `work/validated.csv` and `work/exceptions.csv` (every rejected row\nwith a specific reason). Tier, totals, and lapsed status are recomputed\nfrom each donor's gift history here; a stated value that disagrees is\nnever used, only flagged and carried forward as a warning. A missing or\ninvalid campaign config stops here with a named reason, not a stack\ntrace.\n\n### Step 2: Stop and report\n\nShow the user the validation summary and the full contents of\n`work/exceptions.csv` before generating anything. Excluded rows stay\nexcluded until a person fixes the source file and this step is rerun.\n\n### Step 3: Calculate asks\n\n```\npython scripts/calculate_ask.py --config <campaign.json>\n```\n\nWrites `work/computed.csv`: ask amount, a full step-by-step calculation\ntrace, a confidence score, and a review level per donor. Never adjust an\nask amount yourself, for any reason.\n\n### Step 4: Generate letters\n\n```\npython scripts/generate_letters.py --config <campaign.json>\n```\n\nRenders every valid donor's letter from the approved paragraph library in\n`references/policy.md`, then writes `output/letters/<donor_id>.html` and\n`output/manifest.csv`. Register (formal, warm, friendly, casual and\nencouraging) varies by tier here, by a fixed lookup table, the same way\nthe ask percentage does; it is not something to write or adjust\nyourself, in this step or step 5. A lapsed Gold or Platinum donor gets\nno automated letter; that record routes to personal outreach instead.\n\n### Step 5: Optional bounded personalization\n\nOnly if the user explicitly asks for a letter to read as more\npersonalized than the template, and only against one already-generated\nletter at a time. Follow `references/personalization_prompt.md` exactly;\nits guardrails are not repeated here so the common batch-only path never\npays their context cost. In short: ground everything in\n`work/computed.csv` or the campaign config, never introduce a number,\npromise, honorific, or urgency device not already present, and leave the\nparagraph unchanged if you cannot personalize within those bounds.\n\n### Step 6: Hand off\n\nReport letters generated, rows excluded to exceptions, and how many\nletters are flagged mandatory versus recommended for review. Nothing is\never sent by this skill.\n\n## Hard rules\n\n- **No automatic sending, ever.** Everything else this pipeline\n  guarantees (no in-model arithmetic, no guessed names or honorifics, no\n  unconfirmed matching claims, no fabricated data) is enforced by the\n  scripts themselves and documented in `references/policy.md`; this is\n  the one rule that is about the agent's own behavior in the wider\n  session, not something the code already prevents.\n- If a step's script reports an error, stop and show the user the exact\n  message. Do not work around it, retry with different arguments, or\n  paper over it when reporting back.\n";
+var ASSESSMENT_MD_TEXT = "# Assessment: charity-donor-outreach skill\n\nPrepared by Bryan Shaw.\n\n## Summary\n\nThe original skill reads as reasonable prose and fails at every layer that\nmatters once it has to run more than once. It embeds its data instead of\nreading it, trusts labels its own data contradicts, asks a language model\nto do arithmetic, invents facts when data is missing, and instructs the\nassistant to make an untrue claim to donors. None of that announces\nitself. Each failure produces a confident, well-formatted, wrong letter.\n\nThe fix is one principle held consistently: verify the data first, then\nlet each tool do the job it is actually good at. Deterministic code owns\nvalidation, tier computation, ask arithmetic, and rendering. The model is\nnever in the batch path at all, which is also what keeps this cheap: the\nsame three scripts process 50 donors or 50,000 for the same cost, zero\nmodel calls either way. A model only ever touches language in one narrow,\noptional, explicitly-requested step, grounded in already-verified fields.\nHumans review by exception, with mandatory gates where the stakes are\nhighest.\n\nRun against the case study's own 50 donors: the pipeline recomputes every\nnumber from each donor's own gift history rather than trusting any stated\nfield, catches four mislabeled tiers, and catches something a label-only\nread never would: two donors stated as Platinum who have not given in\nover three years by the data's own clock, and who now correctly route to\npersonal outreach instead of receiving a naming-opportunity solicitation.\nForty-eight letters generate cleanly; the remaining two are exactly those\nrouted donors.\n\n## Part 1: Findings and their impact\n\n**Unsupported donor claims.** The original instructs the assistant to\ntell every donor their gift is matched, \"even if no match is confirmed,\nwe can sort that out later.\" That is not a hallucination risk to manage;\nit is an unsupported fundraising claim written into the instructions,\nthe kind that creates fraudulent-solicitation exposure. *Fix:* matching\nlanguage is gated behind a `match_confirmed` config field with a required\nsponsor and terms; it is structurally impossible for a letter to mention\na match the campaign has not confirmed, because the code that writes that\nsentence only runs when the flag is true.\n\n**Tier trusted instead of verified, twice over.** The donor database lives\ninside the instruction file instead of the CSV the original skill's own\nstep 1 says to read, and every stated field is trusted on faith. Checking\nthe supplied table against its own tier thresholds finds four donors\nwhose stated tier disagrees with their lifetime total (Ada Yamamoto-Pierce,\nRuth Andersen, and Shirley Magnusdottir are labeled Silver at $17,000,\n$25,000, and $22,000 lifetime, all Gold range; Arthur Mwangi is labeled\nBronze at $2,600, Silver range). Running the actual pipeline surfaces a\nsecond, sharper version of the same problem: Robert Svensson and Walter\nAdeyemi are both labeled Platinum, and both have not given since 2020,\nmore than three years before the data's own reference date. A tier field\nthat conflates \"gives a lot\" with \"gives currently\" would have sent both\na very formal, 40 percent, naming-opportunity solicitation despite being\nlapsed. *Fix:* the skill holds zero donor data of its own and recomputes\ntier, totals, and lapsed status from each donor's raw gift history on\nevery run, never from a stated label. Tier and lapsed status are modeled\nas two independent facts, not one field, specifically because \"how much\"\nand \"how recently\" answer different questions. A lapsed Gold or Platinum\ndonor gets no automated letter at all; that record routes to personal\noutreach, because a form letter to a lapsed major donor risks more of the\nrelationship than a flat-rate ask could raise back.\n\n**Every derived number, not just tier, needs the same treatment.**\nLargest gift, lifetime total, and last gift year are themselves derived\nfrom the gift history, and a source file can state any of them\nincorrectly independent of the tier label. *Fix:* all three are\nrecomputed from `gift_history` and compared against whatever the file\nstates; a disagreement is a warning that follows the record through the\npipeline, and the computed value is what gets used, always. On the case\nstudy's own 50 rows all three tie out cleanly. Tier is the only field\nthat does not.\n\n**Calendar drift.** \"Lapsed\" and \"gave last year\" are date calculations\nwith no defined reference point in the original; the data's own internal\nclock is 2024, so running the skill on a different day silently changes\nwho counts as lapsed. *Fix:* every run requires an explicit `as_of_date`\nin the campaign config, used everywhere a date matters. The demo config\nhere points at 2024-06-30, the data's own clock, deliberately: advancing\nit to today without two years of donor activity that was never collected\nwould flip roughly a quarter of this list to lapsed overnight for a\nreason that has nothing to do with those donors actually stopping their\ngiving. Pointing `as_of_date` at today on a live, continuously updated\ndonor file is exactly correct; dressing up a frozen fixture to look more\ncurrent than it honestly is would not be.\n\n**Inconsistent numbers.** A seven-step ask formula executed by a model in\nprose rounds mid-sequence and leaves \"gave last year\" undefined; a model\nis a poor calculator even when the formula is exact, and small drift\ncompounds across a batch. *Fix:* one deterministic function, fixed\noperation order, one rounding step at the end, a full trace stored per\ndonor so any ask amount can be checked back to the rule that produced it.\nIf a computed ask exceeds the donor's own largest gift, the letter still\ngenerates but is flagged for a fundraiser's review rather than silently\ncapped; that is a judgment call, not a formula's to make alone.\n\n**Fabricated data and people.** \"Make reasonable assumptions and proceed\"\non missing fields, and an unsourced \"relationship manager name\" for\nPlatinum donors specifically, even though the template signs every\nletter regardless of tier. *Fix:* a missing or unparseable required field\nroutes the row to `work/exceptions.csv` with the specific reason instead\nof a guess, and every letter, for every tier, is signed by the real\nperson named once in the campaign config. Nothing is ever invented.\n\n**Gender and title inference.** The original guesses a title from a first\nname \"if it seems obvious.\" *Fix:* a title is used only when the file\nprovides one; otherwise every donor gets `Dear {First Name} {Last Name},`\nwith no guessed honorific. This build goes one step further than treating\nthat as a Platinum-and-Gold-only concession: every tier gets the same\nrespectful salutation. A cheerier greeting for a smaller gift, or a\npresumptive \"we've missed you\" opener for a lapsed donor, reads as\ncondescending once you notice the pattern across a whole batch, even\nthough no single instance looks wrong in isolation. The original's tone\nrequirement (very formal for Platinum down to casual and encouraging for\nBronze) is real and did not disappear; it moved out of the greeting and\ninto a deterministic voice table, see Part 4.\n\n**Donors matched by name instead of a stable identifier.** The original\nlooks donors up by name string throughout. Two donors sharing a name, or\na small typo between systems, can attach one donor's financial history to\na letter addressed to someone else. *Fix:* the donor file carries a\n`donor_id` column, and every stage of the pipeline joins on that id, never\non name. This also sidesteps a failure mode common to the alternative\napproach of deriving an id from the name at read time (a slugified name\ncan collide between two different donors); requiring a stable id in the\nsource file removes that whole class of bug rather than adding a check\nfor it downstream.\n\n**No scalable review path.** Output was HTML pasted into chat with no\nreview step, and the trigger fired on nearly any mention of money, email,\nor events. *Fix:* letters are files plus a manifest carrying a per-donor\nconfidence score and review level; every Platinum letter and anything\nflagged is reviewed by a person before anything ships. The skill never\nsends anything itself. The trigger description now names the one job the\nskill does.\n\n## Part 2: The rewrite\n\n`SKILL.md` is a short orchestrator over three deterministic stages, plus\none optional, narrowly bounded step where a model may touch language:\n\n1. **Validate** (`scripts/validate_input.py`): check required fields,\n   recompute everything computable from `gift_history`, verify every\n   stated value against it, and stop for a person before anything else\n   happens.\n2. **Calculate** (`scripts/calculate_ask.py`): apply the ask policy from\n   `references/policy.md`, with a full trace and a confidence score per\n   donor.\n3. **Generate** (`scripts/generate_letters.py`): build a small structured\n   letter model from the approved paragraph library, validate that model,\n   and only then render it to HTML. A letter is complete and correct with\n   zero model calls; personalization beyond the template is optional,\n   off by default, and constrained to one to two sentences grounded only\n   in already-validated fields, per `references/personalization_prompt.md`,\n   kept out of `SKILL.md` itself so the common batch-only path does not\n   pay the context cost of guardrails it never uses.\n\n`references/policy.md` is the single place tiers, the ask formula,\nsalutation rules, the messaging library, and review gates are defined.\nThe scripts implement it; if the two ever disagree, that is a bug in the\ncode, not a judgment call for whoever reads it next.\n\n`validate_input.py` accepts either a CSV or an XLSX donor file,\ndispatched by extension, into the identical shape before anything else\nruns. Real donor exports are at least as often Excel files as CSVs;\nrequiring a fundraiser to convert their own export before this skill\nwill even read it is friction the pipeline can absorb for free.\n\n**Why `SKILL.md` stays short.** It is the file an agent reads at the\nmoment it decides what to do next, and every line in it competes for the\nsame attention a well-written prompt is trying to hold. The rule applied\nhere: if a line does not change what the agent does next, it belongs in\n`references/policy.md` instead, one link away, not in the file the agent\npays the context cost of on every single trigger.\n\n## Part 3: Two independent rebuilds, reconciled deliberately\n\nThis rewrite was checked against a second, independent, much larger\nrebuild of the same skill (a separate eleven-pass effort covering the\nsame brief, complete with a schema-validated pipeline, a correction and\nresubmit loop, an operational decision log, a style-learning feedback\nloop, a Streamlit review UI, and roughly 160 automated tests). Comparing\nthe two is useful precisely because they converge on the same core\ndiagnosis independently: read the file, never trust a stated label,\ncompute deterministically, gate on review. Where they differ is scope,\nand every difference below was a deliberate call, not an oversight.\n\n**Adopted from the larger build:** a version stamp (`rules_version`) on\nevery output row, so any letter traces back to the exact policy version\nthat produced it; and the discipline of a lean, purpose-built automated\ntest suite (`tests/test_pipeline.py`, 23 tests, stdlib `unittest`, no\nextra dependency to run) locking in exactly the behaviors this rewrite\nfound and fixed, rather than testing for its own sake.\n\n**Deliberately left out, with the reasoning:**\n\n- **Separate JSON schema files** for the donor row and the letter model.\n  A schema file plus a schema-interpreter function is more code than\n  writing the checks directly, and it adds a second place (the schema\n  and the interpreter) that can drift out of sync. Schema files earn\n  their cost when a second consumer needs to validate independently of\n  this pipeline; right now there is one pipeline. Inline checks in\n  `validate_input.py` and `generate_letters.py` give the identical\n  guarantee for less code.\n- **A correction-and-resubmit CLI plus an operational decision log.**\n  `work/exceptions.csv` already gives a fundraiser a specific, named\n  reason per rejected row to fix in their own source system and\n  resubmit; that loop already exists in `SKILL.md` step 2. A tool that\n  applies structured corrections and logs who approved what earns its\n  keep once there is real usage volume and multiple staff approving\n  batches. Building it now would be solving a problem this case study\n  does not yet have.\n- **A style-learning feedback loop.** Even in the build that started\n  one, it is admittedly speculative with no outcome data yet to learn\n  from. Premature there; premature here too, for the same reason.\n- **A server-hosted review application** (the other build's Streamlit\n  app). Running a Python server is real infrastructure someone has to\n  host, patch, and keep running. A serverless alternative that needs\n  nothing running and nothing hosted, a client-side tool that recomputes\n  the identical policy in the browser, does the same job for a\n  non-technical user at a fraction of the operational cost. That tool\n  is `donor-data-review.html`; see Part 6.\n- **Webhook escalation, run archiving, a structured JSON mirror of every\n  CSV.** Each needs either a real external system to integrate with or\n  solves a problem (losing last week's run, needing machine-readable\n  output for a second consumer) that does not exist yet at this scale.\n  `output/` is overwritten each run; that is disclosed in\n  `references/policy.md` rather than engineered around.\n- **44 architecture decision records and a docs/ tree.** That is the\n  other build's own process history. This document is the equivalent at\n  the size this case study actually needs.\n\nThe reason for all of it is scope, not doubt: Doug's brief asks for two\nthings, describe the improvements and their impact, and rewrite the\nskill. A skill that reads its own data, verifies rather than trusts\nevery number, computes deterministically, and gates its highest-stakes\noutput behind a person answers that brief completely on its own.\nNothing cut here is blocked from being built later; the review level,\nconfidence score, and manifest already written are exactly the seams a\ncorrection loop or a review UI would attach to without a redesign.\n\n## Part 4: Second pass, auditing the rewrite itself\n\nThe same discipline applied to the original was turned on this rewrite\nbefore calling it done. Four things this pass found and fixed:\n\n**A single bad value in the donor file crashed the entire batch.**\nSetting one donor's `largest_gift` to a non-numeric placeholder like\n`\"TBD\"`, a near-certainty in a real CRM export, raised an unhandled\nexception that took down validation for all 50 donors, not just that\none row. Every other bad-data case in this pipeline degrades to an\nexcluded row or a warning; this one did not, and it is exactly the\nfailure mode the original was criticized for at the data layer, just\nsurfacing one layer down. *Fix:* an unparseable stated value is now a\nwarning, not a crash; `gift_history` is authoritative regardless, so\nthere was never a reason for this to be fatal. Verified by reproducing\nthe crash, then rerunning the same input clean.\n\n**A missing or malformed campaign config crashed with a raw traceback**\ninstead of a named reason, the same failure mode as above at the config\nlayer. *Fix:* one shared `load_campaign_config` validates every required\nfield up front with a specific, human-readable error. Verified the same\nway: reproduced the crash with a config missing four required fields,\nconfirmed the fix names all four.\n\n**Business-meaningful warnings were escalated the same as noise.** A\ntier-label mismatch and a soft data-formatting warning both cost the\nsame 0.10 confidence penalty, so on the real run all four tier-mismatch\ndonors landed at exactly 0.90 confidence, the pass/report boundary,\nwhich only earns \"recommended\" review. But a tier correction changes a\ndonor's entire treatment (percentage, ask, register) and means the\nsource CRM disagrees with what this run is about to send; that is worth\na guaranteed look, not an easy-to-skip nudge. *Fix:* a tier correction\nand a computed ask that exceeds the donor's largest gift now force\n`mandatory` review directly, independent of the confidence score, which\nis reserved for actual data-quality questions.\n\n**Tone by tier, restored as a deterministic lookup, not a rewrite of the\nsalutation.** The original specified a distinct register per tier\n(Platinum very formal down to Bronze casual and encouraging); the first\npass preserved the ask math and tier-specific closing line but otherwise\nmade every letter's body copy identical regardless of tier, which is not\nactually what \"personalized outreach\" means and was not something the\noriginal findings called for removing, only the guessing was broken, not\nthe tone variation itself. *Fix:* `scripts/generate_letters.py` now\nselects both the opening thank-you line and the closing sign-off phrase\nfrom a `TIER_VOICE` lookup table, the same style of deterministic\ndecision as the ask percentage. The facts (campaign paragraph, ask\namount) still never vary by tier; only the register does. A lapsed\ndonor's opening still reflects their computed financial tier, while the\nre-engagement framing lives in the campaign and ask paragraphs, so a\nlapsed Gold donor is thanked in a Gold register while being invited back\nrather than thanked for support they are not currently giving.\n\nOne resolved ambiguity was also written down rather than left implicit:\nwhether the loyalty, volunteer, and emergency uplifts apply on top of\nBronze's and lapsed donors' flat asks, which the original never states\neither way. They do, in this build; `references/policy.md` now says so\ndirectly instead of leaving it to be inferred from the code.\n\n## Part 5: Proof, on the case study's own data\n\n```\npython scripts/validate_input.py --input sample-donors.csv --config references/campaign_config.example.json\n  rows read: 50, validated: 50, exceptions: 0\n  tier label mismatches (computed tier used instead): 4\n  other stated-value mismatches: 0\n\npython scripts/calculate_ask.py --config references/campaign_config.example.json\n  asks computed: 50, review mandatory: 9, review recommended: 0\n  blocked: 0, no letter (routed to a person): 2\n\npython scripts/generate_letters.py --config references/campaign_config.example.json\n  letters generated: 48, no letter (routed to a person): 2\n  generated letters needing mandatory review: 7\n```\n\nThe two routed-not-generated records are Robert Svensson and Walter\nAdeyemi, the lapsed Platinum donors described above. The nine mandatory\nreviews are the five Platinum donors plus the four tier-corrected donors\n(Ada Yamamoto-Pierce, Ruth Andersen, Shirley Magnusdottir, Arthur\nMwangi), two of the nine with no letter at all and seven with a\ngenerated letter still held for review; recommended review sits at zero\nbecause every donor that used to land there had a reason serious enough\nto be mandatory instead, per Part 4. Every number above reconciles\nacross all three stages by construction, since each stage's output file\nis the next stage's only input.\n\n`sample-donors.csv` is the case study's original donor table, unchanged\nin value, moved out of the instructions and into the file format the\npipeline actually reads. `sample-donors.xlsx` is the same 50 rows as an\nExcel file; running `validate_input.py` against it produces a\nbyte-identical `validated.csv` to the CSV run, confirmed directly.\n`python -m unittest discover -s tests` passes all 23 tests.\n\n## Part 6: A second front door, and the answer to \"how does this scale?\"\n\n`SKILL.md` and the Python scripts answer how an AI agent runs this\nreliably in a batch. They assume something is already driving the\nagent, uploading a file, and reading its output. That leaves an open\nquestion: what does a fundraiser who is not working through an agent\nactually do?\n\n`donor-data-review.html` is the answer, and it is not a report of a\nPython run anymore, it is the program itself. `donor_rules.js` and\n`app.js` are a faithful, tested port of the exact same policy the\nPython scripts implement: open the file in any browser, and it loads\nthe case study's sample data, validates it, recomputes every tier and\nask, and shows the result immediately, no install, no server, nothing\ntransmitted anywhere. A person can then:\n\n- **Replace or merge in more data**, from another file or one donor\n  entered by hand. There is no database behind this; the working set is\n  whatever is currently loaded in the browser tab, which is the honest\n  answer to scaling without persistent storage: the file is the\n  database, and the tool's job is to validate, merge, and recompute it\n  correctly every time, not to pretend it owns a system of record it\n  does not have.\n- **Edit any donor's data directly**, and watch it recompute live. If\n  that donor's tier, ask, or letter changes as a result, and it had\n  already been confirmed, the confirmation clears automatically. A\n  stale approval is treated as no approval at all.\n- **Merge conflicts are never resolved automatically.** A donor ID that\n  already exists in the working set is shown side by side, existing\n  versus incoming, and stays out of the computed results until a person\n  picks one.\n- **Every Platinum donor, every tier correction, and every ask that\n  exceeds a donor's own giving history is visibly flagged and requires\n  an explicit confirmation checkbox before it counts as reviewed.** The\n  ready banner at the top will not say the batch is ready until every\n  flagged donor has been confirmed, matching the original's own stated\n  intention that the highest tiers get the most scrutiny, just enforced\n  structurally instead of hoped for.\n- **A session can be saved and reloaded** as an explicit JSON file the\n  user downloads and re-uploads themselves. Nothing persists\n  automatically between visits; nothing is written anywhere without the\n  user choosing to write it.\n\n**Keeping two implementations of the same policy honest.** A JavaScript\nport of Python logic is a real risk: the two can quietly drift apart.\n`tests/test_js_parity.js` asserts the JavaScript version against the\nexact same expected values the Python test suite asserts. More directly,\n`tests/test_js_full_parity.js` runs the JavaScript pipeline over the\nreal 50-donor fixture and diffs every field against the Python\npipeline's actual output file by file: as of this build, all 50 donors\nmatch on every compared field, and a rendered letter (Ruth Andersen's,\nthe corrected Gold-tier donor) is byte-identical to the Python-rendered\nversion once line endings are normalized. If the two ever disagree,\nthat test fails and says exactly which donor and which field.\n\n## Part 7: This build against the reference build, compared directly\n\nA second, independent, eleven-pass rebuild of the same skill exists,\nalso live: its own `donor-data-review.html` is hosted on GitHub Pages.\nThis section compares the two directly, having actually used both, not\njust read one's source.\n\n**The findings are the same skill, examined twice, not two different\nverdicts.** Both rebuilds land on the same core diagnosis of the\noriginal: it embeds data instead of reading it, trusts a tier label its\nown data contradicts, fabricates a match claim, guesses gender, and asks\na model to do arithmetic. Both catch the identical four tier-label\nmismatches in the mocked data (Ada Yamamoto-Pierce, Ruth Andersen,\nShirley Magnusdottir, Arthur Mwangi) because both compute tier from\nlifetime giving instead of trusting a label. What changed in this\nbuild's second and third passes was never the findings; it was the\ntooling built to surface and act on them. That convergence, reached\nindependently, is itself evidence the diagnosis is right, not an\naccident of two people copying each other.\n\n**Where the architectures genuinely differ, and why that is not a small\ndetail.** The reference build's browser tool edits and reviews data, but\nit does not compute: its own code says so directly (\"the browser never\nrecomputes an ask\"), and its workflow is edit in the browser, download a\ncleaned CSV, then run `calculate_ask.py` and `generate_letters.py` in\nPython to see real updated numbers. This build's browser tool computes\neverything live: `donor_rules.js` is a full, tested port of\n`donor_rules.py`, so an edit shows its real, recalculated consequence\nimmediately, no round trip through a terminal. Neither choice is simply\nbetter; they trade different things:\n\n- The reference build's approach has a real advantage: there is exactly\n  one implementation of the business logic, in Python, so there is no\n  possibility of two engines quietly disagreeing. Its cost is friction:\n  a person reviewing donor data cannot see the actual effect of a\n  correction without leaving the browser.\n- This build's approach directly answers what was actually asked for\n  throughout this exercise (a tool a non-technical user can use\n  entirely on their own, seeing a change's real effect immediately) at\n  the cost of taking on a real risk: two implementations of the same\n  policy that could drift apart silently. That risk is not waved away;\n  it is the reason `tests/test_js_full_parity.js` exists, diffing the\n  JavaScript engine against the Python engine's real output on every\n  run, field by field, and failing loudly the moment they disagree.\n\n**What this build adopted from the reference build, on inspection, and\nwhat it deliberately did not.** Its live version has a clear numbered\nstep tracker (data loaded, errors found, review and correct, sign off,\nexport) that this build's original dashboard-style layout lacked; that\npattern was adopted directly (see `donor-data-review.html`'s step\ntracker, now with two independent gates, data exceptions and donor\nconfirmations, rather than one). Its page is also a far denser\ndocumentation surface, walking a technical reader through ADRs and\narchitecture decisions inline on the same page as the data. This build\ndeliberately keeps the tool itself lean and puts that depth in\n`ASSESSMENT.md` and `WALKTHROUGH.md` instead, on the judgment that a\ntool meant for a fundraiser to actually use should not also try to be a\ntechnical essay; a reader who wants the deep reasoning has it, one link\naway, without every visitor paying the context cost of reading past it.\n\n**What this build has that the reference build does not.** A single\n\"download the complete package\" export bundling the review manifest,\nthe full modified donor data, the change log, every confirmed letter as\nits own file, `SKILL.md`, `ASSESSMENT.md`, and a working copy of the\ntool itself, all in one zip, generated from inside the tool with one\nclick. The reference build's export is narrower: a cleaned CSV, meant\nto be fed back into the Python pipeline. Plain-language translation of\nevery technical warning and review reason, with the original technical\nstring always one click away, not replaced. A merge-conflict view that\nshows the exact fields that differ, not just the two donor names. A\nbulk-confirm action that is not a silent shortcut: it names every donor\nit is about to mark reviewed, in a real confirmation dialog, before\ndoing anything, so it cannot become a way to wave through donors nobody\nactually looked at.\n\n**The honest answer to \"which is better.\"** For the literal brief,\nconsistent, reliable, scalable, both satisfy it; the deterministic\npipeline underneath is materially the same idea in both. For a\nnon-technical fundraiser working alone, without a terminal, this build\nis the stronger answer, because it is the one where editing data and\nseeing the truth immediately are the same action. For an organization\nthat would rather never run two implementations of the same logic and\nis comfortable asking staff to use a terminal step, the reference\nbuild's simpler, single-engine design is the more conservative choice,\nand conservative is not a criticism in a system that computes what a\nreal donor gets asked for.\n";
+var README_MD_TEXT = "# charity-donor-outreach: assessment and rewrite\n\nPrepared by Bryan Shaw, in response to the case study brief: assess the\n`charity-donor-outreach` skill, describe improvements and their impact,\nand rewrite the skill so it produces consistent, reliable output at a\ngrowing scale.\n\n## Where to start\n\n1. **[ASSESSMENT.md](ASSESSMENT.md)** answers both parts of the brief\n   directly: what was wrong, why it matters, what changed, and what was\n   deliberately left out of scope and why.\n2. **[donor-data-review.html](donor-data-review.html)** is the\n   interactive tool itself: one self-contained file, no external script\n   or data file, no install, no server. Double-click it. It loads the\n   case study's sample data, validates it live, and lets you edit, merge\n   in more data, and confirm flagged donors, all in the browser, nothing\n   ever transmitted anywhere. This is the direct answer to \"how does\n   this scale without a database.\"\n3. **[SKILL.md](SKILL.md)** is the rewritten skill an AI agent reads for\n   the batch/automated path.\n\n## Two front doors, one policy\n\nEvery rule lives in `references/policy.md`. Two independent\nimplementations run it:\n\n- **`scripts/*.py`**, driven by an agent through `SKILL.md`, for batch\n  runs at any donor count.\n- **`donor_rules.js` + `app.js` + `ui.js`**, driven directly by a\n  person in `donor-data-review.html`, for hands-on review with no agent\n  and no server involved.\n\n`tests/test_js_full_parity.js` runs both over the same 50-donor fixture\nand diffs every field; they must agree, or the test fails and says\nexactly where.\n\n## Running the Python pipeline\n\n```\npython scripts/validate_input.py --input sample-donors.csv --config references/campaign_config.example.json\npython scripts/calculate_ask.py --config references/campaign_config.example.json\npython scripts/generate_letters.py --config references/campaign_config.example.json\npython -m unittest discover -s tests\n```\n\n`sample-donors.csv` and `sample-donors.xlsx` are the case study's\noriginal 50 donors, unchanged in value, in the file format the pipeline\nactually reads (both work identically; extension decides which reader\nruns). `references/campaign_config.example.json` is a complete example\ncampaign configuration. `work/` and `output/` are the last run's real,\nregeneratable output, kept here as evidence the pipeline runs clean:\n0 exceptions, 4 tier labels corrected against their own lifetime\ntotals, 48 letters generated, 2 lapsed major donors routed to personal\noutreach instead of an automated letter.\n\n## Running the interactive tool\n\nOpen `donor-data-review.html` directly in a browser (double-click it,\nor `file://` it), no server needed. Or, to run the JS test suites,\nNode is required:\n\n```\nnode tests/test_js_parity.js\nnode tests/test_js_full_parity.js\nnode tests/test_app_utils.js\n```\n\nThe interactive tool itself: auto-loads and validates the sample data on\nopen (matches the Python run exactly, including the 4 tier corrections\nand 2 lapsed-major-donor routes, named explicitly in its Findings\npanel), lets you edit any donor, merge in more data (a file or a manual\nentry), and always shows what changed in plain language before asking\nfor confirmation. A merge conflict (a donor_id already present) is never\nresolved automatically; it's shown field by field for a person to\ndecide. Sort any column, and use \"mark all shown reviewed\" to bulk-confirm\ndonors matching your current filter, only after naming every one of them\nin a confirmation dialog first, never silently. Every load, edit, merge,\nand confirmation is recorded in an in-page change log, exportable as its\nown CSV. A guided tour (top of the page) walks through all of it step by\nstep. Exports: everything in one zip (manifest, modified donor data,\nchange log, every confirmed letter as its own file), or each piece\nseparately. The zip is written by a small in-house zip function, no\nexternal library, verified against Windows' native unzip and against an\nindependent reader in the test suite. Nothing leaves the browser at any\npoint; a session can be saved and reloaded as an explicit JSON file the\nuser downloads and re-uploads themselves.\n\n## Layout\n\n```\nSKILL.md                     the skill an agent reads (batch path)\ndonor-data-review.html       the interactive tool (hands-on path), self-contained, built\ndonor-data-review.template.html  the source template (edit this, not the built file)\ndonor_rules.js, app.js, ui.js  the browser-side implementation (canonical source, tested directly)\nscripts/                     the deterministic Python pipeline\n  donor_rules.py               shared policy logic (tiers, ask math, confidence)\n  validate_input.py            step 1: read, verify, recompute (CSV or XLSX)\n  calculate_ask.py             step 3: deterministic ask calculation\n  generate_letters.py          step 4: render letters, tone by tier\n  build_deliverable.py         inlines the sample data and the three .js files into\n                                the template, producing the self-contained HTML above\nreferences/\n  policy.md                    single source of truth for every rule\n  campaign_config.example.json\n  personalization_prompt.md    step 5's guardrails (off by default)\ntests/\n  test_pipeline.py             23 Python tests, stdlib only\n  test_js_parity.js            JS unit tests against the same expected values\n  test_js_full_parity.js       full-pipeline JS vs. Python diff on the real fixture\n  test_app_utils.js            CSV round-trip and the zip writer, read back by an independent parser\nsample-donors.csv / .xlsx    the case study's data, as an uploaded file\nASSESSMENT.md                 the written answer to the brief\nWALKTHROUGH.md                section-by-section talking points (speaker notes, not a deliverable in itself)\nwork/, output/                the last Python run's real output\n```\n";
+</script>
+<script>
+/* Inlined from donor_rules.js. Edit that file, not this one; run this build script to regenerate. */
+/*
+ * Shared policy implementation for the charity-donor-outreach skill.
+ *
+ * This is a line-for-line port of scripts/donor_rules.py. Every threshold
+ * here must match references/policy.md and donor_rules.py exactly; if this
+ * file and the Python version ever disagree, that is a defect, checked by
+ * tests/test_js_parity.js against the same fixed expected values the
+ * Python test suite asserts. Runs identically in Node (for the parity
+ * test) and in the browser (for the interactive tool), with no build
+ * step and no dependency.
+ */
+(function (root) {
+  "use strict";
+
+  var RULES_VERSION = "1.0.0";
+
+  var TIER_MINIMUMS = [
+    ["Platinum", 50000],
+    ["Gold", 10000],
+    ["Silver", 1000],
+    ["Bronze", 0],
+  ];
+  var PERCENT_ASK = { Platinum: 0.40, Gold: 0.25, Silver: 0.15 };
+  var FLAT_ASK_BRONZE = 150;
+  var FLAT_ASK_LAPSED = 50;
+  var LAPSED_AFTER_YEARS = 3;
+  var LOYALTY_UPLIFT = 0.10;
+  var VOLUNTEER_UPLIFT = 100;
+  var EMERGENCY_MULTIPLIER = 1.2;
+  var ROUND_TO = 50;
+  var MIN_ASK = 50;
+
+  var CAMPAIGN_TYPES = ["emergency_appeal", "annual_fund", "capital_campaign", "event_fundraiser"];
+
+  var CONFIDENCE_FAIL_BELOW = 0.70;
+  var CONFIDENCE_REPORT_BELOW = 0.90;
+  var WARNING_PENALTY = 0.10;
+
+  var GIFT_TOKEN = /^\s*(\d{4})\s*:\s*\$?\s*([\d,]+(?:\.\d+)?)\s*$/;
+
+  var REQUIRED_CONFIG_FIELDS = [
+    "campaign_type", "as_of_date", "charity_name", "donation_url",
+    "signer_name", "signer_title", "match_confirmed",
+  ];
+
+  function fmtMoney(n) {
+    var v = Math.round(n * 100) / 100;
+    return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtMoney0(n) {
+    return Math.round(n).toLocaleString("en-US");
+  }
+
+  function validateCampaignConfig(config) {
+    // Same checks as donor_rules.load_campaign_config, applied to an
+    // already-parsed object instead of a file path. Throws Error with a
+    // specific, human-readable message naming exactly what is wrong.
+    var missing = REQUIRED_CONFIG_FIELDS.filter(function (f) {
+      var v = config[f];
+      return v === undefined || v === null || v === "";
+    });
+    if (missing.length) {
+      throw new Error("campaign config is missing required field(s): " + missing.join(", "));
+    }
+    if (CAMPAIGN_TYPES.indexOf(config.campaign_type) === -1) {
+      throw new Error("campaign config campaign_type '" + config.campaign_type + "' is not one of " + CAMPAIGN_TYPES.join(", "));
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(config.as_of_date) || isNaN(Date.parse(config.as_of_date + "T00:00:00Z"))) {
+      throw new Error("campaign config as_of_date '" + config.as_of_date + "' is not a valid YYYY-MM-DD date");
+    }
+    if (typeof config.match_confirmed !== "boolean") {
+      throw new Error("campaign config match_confirmed must be true or false");
+    }
+    if (config.match_confirmed) {
+      ["match_sponsor", "match_terms"].forEach(function (f) {
+        if (!String(config[f] || "").trim()) {
+          throw new Error("campaign config match_confirmed is true but " + f + " is missing");
+        }
+      });
+    }
+    return config;
+  }
+
+  function asOfYear(config) {
+    return parseInt(String(config.as_of_date).split("-")[0], 10);
+  }
+
+  function letterDateLabel(config) {
+    var MONTHS = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"];
+    var parts = String(config.as_of_date).split("-");
+    var y = parts[0], m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+    return MONTHS[m - 1] + " " + String(d).padStart(2, "0") + ", " + y;
+  }
+
+  function parseGiftHistory(raw) {
+    if (raw === null || raw === undefined || !String(raw).trim()) {
+      throw new Error("gift_history is empty");
+    }
+    var tokens = String(raw).split(";");
+    var gifts = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      var match = GIFT_TOKEN.exec(token);
+      if (!match) {
+        throw new Error("unparseable gift entry: '" + token.trim() + "'");
+      }
+      var year = parseInt(match[1], 10);
+      var amount = parseFloat(match[2].replace(/,/g, ""));
+      if (!(amount > 0)) {
+        throw new Error("non-positive gift amount: '" + token.trim() + "'");
+      }
+      gifts.push([year, amount]);
+    }
+    gifts.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    return gifts;
+  }
+
+  function computeTier(lifetimeTotal) {
+    for (var i = 0; i < TIER_MINIMUMS.length; i++) {
+      if (lifetimeTotal >= TIER_MINIMUMS[i][1]) return TIER_MINIMUMS[i][0];
+    }
+    return "Bronze";
+  }
+
+  function isLapsed(lastGiftYear, asOfYearVal) {
+    return (asOfYearVal - lastGiftYear) > LAPSED_AFTER_YEARS;
+  }
+
+  function givingStreak(giftYears, asOfYearVal) {
+    var years = {};
+    giftYears.forEach(function (y) { years[y] = true; });
+    var streak = 0, year = asOfYearVal - 1;
+    while (years[year]) { streak += 1; year -= 1; }
+    return streak;
+  }
+
+  function roundHalfUp(amount, step) {
+    step = step || ROUND_TO;
+    return Math.floor((amount + step / 2) / step) * step;
+  }
+
+  function computeAsk(opts) {
+    // opts: {tier, lapsed, largestGift, lastGiftYear, volunteer, campaignType, asOfYear}
+    var result = { amount: null, trace: [], warnings: [], reviewReasons: [] };
+
+    if (opts.lapsed && (opts.tier === "Gold" || opts.tier === "Platinum")) {
+      result.reviewReasons.push("lapsed " + opts.tier + " donor: route to personal outreach, no automated letter");
+      result.trace.push("lapsed major donor: ask calculation skipped by policy");
+      return result;
+    }
+
+    var amount;
+    if (opts.lapsed) {
+      amount = FLAT_ASK_LAPSED;
+      result.trace.push("base: lapsed re-engagement flat $" + FLAT_ASK_LAPSED);
+    } else if (PERCENT_ASK.hasOwnProperty(opts.tier)) {
+      var pct = PERCENT_ASK[opts.tier];
+      amount = opts.largestGift * pct;
+      result.trace.push("base: " + opts.tier + " " + Math.round(pct * 100) + "% of largest gift $" + fmtMoney0(opts.largestGift) + " = $" + fmtMoney(amount));
+    } else {
+      amount = FLAT_ASK_BRONZE;
+      result.trace.push("base: Bronze flat $" + FLAT_ASK_BRONZE);
+    }
+
+    if (opts.lastGiftYear === opts.asOfYear - 1) {
+      amount *= 1 + LOYALTY_UPLIFT;
+      result.trace.push("loyalty uplift: gave in " + (opts.asOfYear - 1) + ", x" + (1 + LOYALTY_UPLIFT).toFixed(2) + " = $" + fmtMoney(amount));
+    }
+    if (opts.volunteer) {
+      amount += VOLUNTEER_UPLIFT;
+      result.trace.push("volunteer uplift: +$" + VOLUNTEER_UPLIFT + " = $" + fmtMoney(amount));
+    }
+    if (opts.campaignType === "emergency_appeal") {
+      amount *= EMERGENCY_MULTIPLIER;
+      result.trace.push("emergency multiplier: x" + EMERGENCY_MULTIPLIER + " = $" + fmtMoney(amount));
+    }
+
+    var rounded = Math.max(roundHalfUp(amount), MIN_ASK);
+    result.trace.push("rounded once to nearest $" + ROUND_TO + ": $" + fmtMoney0(rounded));
+    result.amount = rounded;
+
+    if (!opts.lapsed && PERCENT_ASK.hasOwnProperty(opts.tier) && rounded > opts.largestGift) {
+      result.reviewReasons.push("computed ask $" + fmtMoney0(rounded) + " exceeds largest single gift $" + fmtMoney0(opts.largestGift) + ": needs a fundraiser's judgment before sending, not capped automatically");
+    }
+
+    return result;
+  }
+
+  function confidenceScore(warningCount) {
+    return Math.round(Math.max(1.0 - WARNING_PENALTY * warningCount, 0.0) * 100) / 100;
+  }
+
+  function confidenceBand(confidence) {
+    if (confidence < CONFIDENCE_FAIL_BELOW) return "fail";
+    if (confidence < CONFIDENCE_REPORT_BELOW) return "report";
+    return "pass";
+  }
+
+  function reviewLevel(tier, confidence, reviewReasons) {
+    if (tier === "Platinum" || (reviewReasons && reviewReasons.length) || confidence < CONFIDENCE_REPORT_BELOW) {
+      return "mandatory";
+    }
+    if (confidence < 1.0) return "recommended";
+    return "none";
+  }
+
+  function csvSafe(value) {
+    var text = String(value);
+    var first = text.slice(0, 1);
+    return (first === "=" || first === "+" || first === "-" || first === "@") ? "'" + text : text;
+  }
+
+  function esc(value) {
+    // Matches Python's html.escape(str(value), quote=False): & < > only.
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function splitName(fullName) {
+    var parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+    if (parts.length <= 1) return [parts[0] || "", parts[0] || ""];
+    return [parts.slice(0, -1).join(" "), parts[parts.length - 1]];
+  }
+
+  var DonorRules = {
+    RULES_VERSION: RULES_VERSION,
+    TIER_MINIMUMS: TIER_MINIMUMS,
+    PERCENT_ASK: PERCENT_ASK,
+    FLAT_ASK_BRONZE: FLAT_ASK_BRONZE,
+    FLAT_ASK_LAPSED: FLAT_ASK_LAPSED,
+    LAPSED_AFTER_YEARS: LAPSED_AFTER_YEARS,
+    CAMPAIGN_TYPES: CAMPAIGN_TYPES,
+    CONFIDENCE_FAIL_BELOW: CONFIDENCE_FAIL_BELOW,
+    CONFIDENCE_REPORT_BELOW: CONFIDENCE_REPORT_BELOW,
+    validateCampaignConfig: validateCampaignConfig,
+    asOfYear: asOfYear,
+    letterDateLabel: letterDateLabel,
+    parseGiftHistory: parseGiftHistory,
+    computeTier: computeTier,
+    isLapsed: isLapsed,
+    givingStreak: givingStreak,
+    roundHalfUp: roundHalfUp,
+    computeAsk: computeAsk,
+    confidenceScore: confidenceScore,
+    confidenceBand: confidenceBand,
+    reviewLevel: reviewLevel,
+    csvSafe: csvSafe,
+    esc: esc,
+    splitName: splitName,
+    fmtMoney0: fmtMoney0,
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = DonorRules;
+  } else {
+    root.DonorRules = DonorRules;
+  }
+})(typeof window !== "undefined" ? window : this);
+
+</script>
+<script>
+/* Inlined from app.js. Edit that file, not this one; run this build script to regenerate. */
+/*
+ * Pipeline logic layer: validate -> calculate -> generate, as pure
+ * functions over plain JS objects. Ports scripts/validate_input.py and
+ * scripts/generate_letters.py. No DOM access here; ui.js owns state and
+ * rendering and calls into this file. Depends on donor_rules.js (window.DonorRules).
+ */
+(function (root) {
+  "use strict";
+  var R = (typeof module !== "undefined" && module.exports) ? require("./donor_rules.js") : root.DonorRules;
+
+  // RFC4180-ish CSV parser: quoted fields, embedded commas/newlines/escaped
+  // quotes ("" inside a quoted field). Used both for the browser file
+  // upload and for the Node full-pipeline parity test. Returns a list of
+  // plain objects keyed by the header row.
+  function parseCsv(text) {
+    var rows = [];
+    var row = [];
+    var field = "";
+    var inQuotes = false;
+    var i = 0;
+    var n = text.length;
+    function pushField() { row.push(field); field = ""; }
+    function pushRow() { pushField(); rows.push(row); row = []; }
+    while (i < n) {
+      var c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i += 1; continue;
+        }
+        field += c; i += 1; continue;
+      }
+      if (c === '"') { inQuotes = true; i += 1; continue; }
+      if (c === ',') { pushField(); i += 1; continue; }
+      if (c === '\r') { i += 1; continue; }
+      if (c === '\n') { pushRow(); i += 1; continue; }
+      field += c; i += 1;
+    }
+    if (field.length || row.length) pushRow();
+    while (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") rows.pop();
+    if (!rows.length) return [];
+    var headers = rows[0].map(function (h) { return h.trim(); });
+    return rows.slice(1).map(function (r) {
+      var obj = {};
+      headers.forEach(function (h, idx) { obj[h] = r[idx] !== undefined ? r[idx] : ""; });
+      return obj;
+    });
+  }
+
+  function toCsv(rows, fieldnames) {
+    var cols = fieldnames || (rows.length ? Object.keys(rows[0]) : []);
+    function esc(v) {
+      var s = v === null || v === undefined ? "" : String(v);
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    var lines = [cols.join(",")];
+    rows.forEach(function (r) { lines.push(cols.map(function (c) { return esc(r[c]); }).join(",")); });
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  // ---- minimal ZIP writer (STORE only, no compression) ----
+  // No external dependency: a full compressing zip library is real weight
+  // to inline for one feature. STORE-method entries are a fully valid ZIP
+  // file, just uncompressed; for a batch of short text letters the size
+  // difference is negligible and every mainstream unzip tool opens it
+  // exactly like any other .zip. Returns a Uint8Array; callers wrap it in
+  // a Blob for download.
+  var CRC_TABLE = (function () {
+    var table = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  function crc32(bytes) {
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function utf8Bytes(str) {
+    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str);
+    // Node fallback for the test suite.
+    return new Uint8Array(Buffer.from(str, "utf8"));
+  }
+
+  function writeUint32LE(arr, offset, value) {
+    arr[offset] = value & 0xFF;
+    arr[offset + 1] = (value >>> 8) & 0xFF;
+    arr[offset + 2] = (value >>> 16) & 0xFF;
+    arr[offset + 3] = (value >>> 24) & 0xFF;
+  }
+  function writeUint16LE(arr, offset, value) {
+    arr[offset] = value & 0xFF;
+    arr[offset + 1] = (value >>> 8) & 0xFF;
+  }
+
+  function makeZipBytes(files) {
+    // files: [{name: string, content: string}]
+    var DOS_TIME = 0x0000, DOS_DATE = 0x0021; // fixed dummy timestamp, not load-bearing
+    var localParts = [];
+    var centralParts = [];
+    var offset = 0;
+
+    files.forEach(function (file) {
+      var nameBytes = utf8Bytes(file.name);
+      var dataBytes = utf8Bytes(file.content);
+      var crc = crc32(dataBytes);
+
+      var local = new Uint8Array(30 + nameBytes.length);
+      writeUint32LE(local, 0, 0x04034b50);
+      writeUint16LE(local, 4, 20);
+      writeUint16LE(local, 6, 0);
+      writeUint16LE(local, 8, 0); // method 0 = store
+      writeUint16LE(local, 10, DOS_TIME);
+      writeUint16LE(local, 12, DOS_DATE);
+      writeUint32LE(local, 14, crc);
+      writeUint32LE(local, 18, dataBytes.length);
+      writeUint32LE(local, 22, dataBytes.length);
+      writeUint16LE(local, 26, nameBytes.length);
+      writeUint16LE(local, 28, 0);
+      local.set(nameBytes, 30);
+
+      localParts.push(local, dataBytes);
+
+      var central = new Uint8Array(46 + nameBytes.length);
+      writeUint32LE(central, 0, 0x02014b50);
+      writeUint16LE(central, 4, 20);
+      writeUint16LE(central, 6, 20);
+      writeUint16LE(central, 8, 0);
+      writeUint16LE(central, 10, 0);
+      writeUint16LE(central, 12, DOS_TIME);
+      writeUint16LE(central, 14, DOS_DATE);
+      writeUint32LE(central, 16, crc);
+      writeUint32LE(central, 20, dataBytes.length);
+      writeUint32LE(central, 24, dataBytes.length);
+      writeUint16LE(central, 28, nameBytes.length);
+      writeUint16LE(central, 30, 0);
+      writeUint16LE(central, 32, 0);
+      writeUint16LE(central, 34, 0);
+      writeUint16LE(central, 36, 0);
+      writeUint32LE(central, 38, 0);
+      writeUint32LE(central, 42, offset);
+      central.set(nameBytes, 46);
+      centralParts.push(central);
+
+      offset += local.length + dataBytes.length;
+    });
+
+    var centralStart = offset;
+    var centralSize = centralParts.reduce(function (sum, p) { return sum + p.length; }, 0);
+
+    var end = new Uint8Array(22);
+    writeUint32LE(end, 0, 0x06054b50);
+    writeUint16LE(end, 4, 0);
+    writeUint16LE(end, 6, 0);
+    writeUint16LE(end, 8, files.length);
+    writeUint16LE(end, 10, files.length);
+    writeUint32LE(end, 12, centralSize);
+    writeUint32LE(end, 16, centralStart);
+    writeUint16LE(end, 20, 0);
+
+    var totalLength = localParts.reduce(function (s, p) { return s + p.length; }, 0) + centralSize + end.length;
+    var out = new Uint8Array(totalLength);
+    var pos = 0;
+    localParts.forEach(function (p) { out.set(p, pos); pos += p.length; });
+    centralParts.forEach(function (p) { out.set(p, pos); pos += p.length; });
+    out.set(end, pos);
+    return out;
+  }
+
+  var REQUIRED_FIELDS = ["donor_id", "donor_name", "gift_history"];
+  var VOLUNTEER_YES = ["yes", "y", "true", "1"];
+  var VOLUNTEER_NO = ["no", "n", "false", "0", ""];
+
+  function statedFloat(raw) {
+    var text = String(raw == null ? "" : raw).trim().replace(/,/g, "").replace(/\$/g, "");
+    if (!text) return { value: null, garbage: false };
+    var n = Number(text);
+    if (isNaN(n)) return { value: null, garbage: true };
+    return { value: n, garbage: false };
+  }
+  function statedInt(raw) {
+    var r = statedFloat(raw);
+    return { value: r.value == null ? null : Math.trunc(r.value), garbage: r.garbage };
+  }
+
+  // Mirrors validate_input.validate_row. Returns {record, exceptionReasons, mismatches}.
+  function validateRow(row, asOfYear) {
+    var donorId = String(row.donor_id || "").trim();
+    var donorName = String(row.donor_name || "").trim();
+
+    var missing = REQUIRED_FIELDS.filter(function (f) { return !String(row[f] || "").trim(); });
+    if (missing.length) {
+      return { record: null, exceptionReasons: ["missing required field(s): " + missing.join(", ")], mismatches: [] };
+    }
+
+    var gifts;
+    try {
+      gifts = R.parseGiftHistory(row.gift_history);
+    } catch (exc) {
+      return { record: null, exceptionReasons: ["unparseable gift_history: " + exc.message], mismatches: [] };
+    }
+
+    var future = gifts.filter(function (g) { return g[0] > asOfYear; }).map(function (g) { return g[0]; });
+    if (future.length) {
+      var uniqFuture = future.filter(function (v, i) { return future.indexOf(v) === i; }).sort();
+      return { record: null, exceptionReasons: ["gift year(s) " + JSON.stringify(uniqFuture) + " are after the campaign as_of year " + asOfYear], mismatches: [] };
+    }
+
+    var amounts = gifts.map(function (g) { return g[1]; });
+    var years = gifts.map(function (g) { return g[0]; });
+    var computedLargest = Math.max.apply(null, amounts);
+    var computedLifetime = amounts.reduce(function (a, b) { return a + b; }, 0);
+    var computedLastYear = Math.max.apply(null, years);
+
+    var warnings = [];
+    var mismatches = [];
+
+    var sl = statedFloat(row.largest_gift);
+    if (sl.garbage) { warnings.push("stated largest_gift '" + row.largest_gift + "' is not a number: ignored, computed value used"); mismatches.push("value"); }
+    else if (sl.value != null && Math.abs(sl.value - computedLargest) > 0.01) { warnings.push("stated largest_gift $" + R.fmtMoney0(sl.value) + " disagrees with computed $" + R.fmtMoney0(computedLargest) + " from gift_history: computed value used"); mismatches.push("value"); }
+
+    var slt = statedFloat(row.lifetime_total);
+    if (slt.garbage) { warnings.push("stated lifetime_total '" + row.lifetime_total + "' is not a number: ignored, computed value used"); mismatches.push("value"); }
+    else if (slt.value != null && Math.abs(slt.value - computedLifetime) > 0.01) { warnings.push("stated lifetime_total $" + R.fmtMoney0(slt.value) + " disagrees with computed $" + R.fmtMoney0(computedLifetime) + " from gift_history: computed value used"); mismatches.push("value"); }
+
+    var sly = statedInt(row.last_gift_year);
+    if (sly.garbage) { warnings.push("stated last_gift_year '" + row.last_gift_year + "' is not a number: ignored, computed value used"); mismatches.push("value"); }
+    else if (sly.value != null && sly.value !== computedLastYear) { warnings.push("stated last_gift_year " + sly.value + " disagrees with computed " + computedLastYear + " from gift_history: computed value used"); mismatches.push("value"); }
+
+    var computedTier = R.computeTier(computedLifetime);
+    var statedTier = String(row.tier || "").trim();
+    var mandatoryReasons = [];
+    if (statedTier && statedTier !== "Lapsed" && statedTier !== "Unknown" && statedTier !== computedTier) {
+      warnings.push("stated tier '" + statedTier + "' disagrees with computed tier '" + computedTier + "' from lifetime_total $" + R.fmtMoney0(computedLifetime) + ": computed tier used");
+      mismatches.push("tier");
+      mandatoryReasons.push("tier corrected from '" + statedTier + "' to '" + computedTier + "': verify against the source system before sending");
+    }
+
+    var lapsed = R.isLapsed(computedLastYear, asOfYear);
+    var volunteerRaw = String(row.volunteer || "").trim().toLowerCase();
+    if (VOLUNTEER_YES.indexOf(volunteerRaw) === -1 && VOLUNTEER_NO.indexOf(volunteerRaw) === -1) {
+      warnings.push("unrecognized volunteer value '" + row.volunteer + "': treated as No");
+    }
+    var volunteer = VOLUNTEER_YES.indexOf(volunteerRaw) !== -1;
+
+    var record = {
+      donor_id: donorId,
+      donor_name: donorName,
+      title: String(row.title || "").trim(),
+      region: String(row.region || "").trim(),
+      gift_history: String(row.gift_history).trim(),
+      largest_gift: computedLargest.toFixed(2),
+      lifetime_total: computedLifetime.toFixed(2),
+      last_gift_year: String(computedLastYear),
+      volunteer: volunteer ? "Yes" : "No",
+      tier: computedTier,
+      status: lapsed ? "lapsed" : "active",
+      warnings: warnings.join(" | "),
+      mandatory_reasons: mandatoryReasons.join(" | "),
+      rules_version: R.RULES_VERSION,
+    };
+    return { record: record, exceptionReasons: [], mismatches: mismatches };
+  }
+
+  // Runs validate_row across a raw row list. Duplicate donor_id detection
+  // included, mirroring validate_input.run's line loop.
+  function runValidation(rows, config) {
+    var asOfYear = R.asOfYear(config);
+    var validated = [], exceptions = [];
+    var seenIds = {};
+    var tierMismatchCount = 0, otherMismatchCount = 0;
+
+    rows.forEach(function (row, idx) {
+      var donorId = String(row.donor_id || "").trim();
+      if (donorId && seenIds.hasOwnProperty(donorId)) {
+        exceptions.push({ line: idx + 2, donor_id: donorId, donor_name: row.donor_name || "", reason: "duplicate donor_id, first seen at line " + seenIds[donorId] });
+        return;
+      }
+      var result = validateRow(row, asOfYear);
+      if (result.exceptionReasons.length) {
+        exceptions.push({ line: idx + 2, donor_id: donorId, donor_name: row.donor_name || "", reason: result.exceptionReasons.join("; ") });
+        return;
+      }
+      if (donorId) seenIds[donorId] = idx + 2;
+      tierMismatchCount += result.mismatches.filter(function (m) { return m === "tier"; }).length;
+      otherMismatchCount += result.mismatches.filter(function (m) { return m === "value"; }).length;
+      validated.push(result.record);
+    });
+
+    return { validated: validated, exceptions: exceptions, tierMismatchCount: tierMismatchCount, otherMismatchCount: otherMismatchCount };
+  }
+
+  // Mirrors calculate_ask.run's per-donor loop.
+  function calculateAsk(donor, config) {
+    var asOfYear = R.asOfYear(config);
+    var giftYears = R.parseGiftHistory(donor.gift_history).map(function (g) { return g[0]; });
+    var ask = R.computeAsk({
+      tier: donor.tier, lapsed: donor.status === "lapsed",
+      largestGift: parseFloat(donor.largest_gift), lastGiftYear: parseInt(donor.last_gift_year, 10),
+      volunteer: donor.volunteer === "Yes", campaignType: config.campaign_type, asOfYear: asOfYear,
+    });
+
+    var validationWarnings = (donor.warnings || "").split(" | ").filter(Boolean);
+    var allWarnings = validationWarnings.concat(ask.warnings);
+    var confidence = R.confidenceScore(allWarnings.length);
+    var band = R.confidenceBand(confidence);
+    var amount = ask.amount;
+    var reviewReasons = ask.reviewReasons.slice();
+    if (band === "fail" && amount !== null) {
+      amount = null;
+      reviewReasons.push("confidence " + confidence.toFixed(2) + " is below the fail threshold " + R.CONFIDENCE_FAIL_BELOW.toFixed(2) + ": blocked pending data fixes");
+    }
+    var mandatoryFromValidation = (donor.mandatory_reasons || "").split(" | ").filter(Boolean);
+    var allReviewReasons = reviewReasons.concat(mandatoryFromValidation);
+    var level = R.reviewLevel(donor.tier, confidence, allReviewReasons);
+
+    var out = {};
+    Object.keys(donor).forEach(function (k) { out[k] = donor[k]; });
+    out.streak = String(R.givingStreak(giftYears, asOfYear));
+    out.ask_amount = amount === null ? "" : String(amount);
+    out.ask_trace = ask.trace.join(" -> ");
+    out.warnings = allWarnings.join(" | ");
+    out.review_reasons = allReviewReasons.join(" | ");
+    out.confidence = confidence.toFixed(2);
+    out.confidence_band = band;
+    out.review_level = level;
+    return out;
+  }
+
+  // ---- letter generation (ports generate_letters.py) ----
+
+  var BASE_PARAGRAPHS = {
+    emergency_appeal: "Right now, animals rescued from cruelty and neglect need emergency shelter, veterinary care, and a safe place to recover. Your gift today goes to work immediately, funding rescue operations and urgent medical treatment for animals with nowhere else to turn.",
+    annual_fund: "Year after year, steady support from donors like you is what allows us to plan rescues, staff shelters, and answer every call for help. Your continued partnership is the foundation this work is built on.",
+    annual_fund_lapsed: "Our work to plan rescues, staff shelters, and answer every call for help depends on donors who step back in when they are able. We would be glad to have you with us again.",
+    capital_campaign: "We are building spaces that will shelter and heal animals for decades to come. A gift to this campaign is a lasting investment, one that will still be saving lives long after the construction dust has settled.",
+    event_fundraiser: "Our upcoming event brings together supporters from across the community for the animals we all care about. We would love for you to be part of it.",
+  };
+
+  var TIER_VOICE = {
+    Platinum: { thanks: "On behalf of everyone at {charity}, I want to extend my deepest, most personal gratitude for your extraordinary generosity.", closing_phrase: "With my deepest gratitude" },
+    Gold: { thanks: "On behalf of everyone at {charity}, I want to personally thank you for your generosity and your continued partnership with our work.", closing_phrase: "With gratitude" },
+    Silver: { thanks: "On behalf of everyone at {charity}, thank you so much for your generosity and for being part of our community of supporters.", closing_phrase: "With thanks" },
+    Bronze: { thanks: "On behalf of everyone at {charity}, thank you for your support. Every gift, no matter the size, helps make a real difference.", closing_phrase: "Thanks so much" },
+  };
+
+  var TIER_CLOSING_LINE = {
+    Platinum: "Given your extraordinary generosity, I would welcome a conversation about a naming opportunity in recognition of your support.",
+    Gold: "Your gift can also be structured as a legacy commitment; I am glad to share more about our legacy giving options.",
+    Silver: "Consider spreading your impact across the year with our monthly giving option.",
+    Bronze: "You can also multiply your impact by starting your own peer fundraising page!",
+  };
+
+  var LIFETIME_MENTION_MINIMUM = 500;
+  var REQUIRED_LETTER_FIELDS = ["donor_id", "letter_date", "salutation", "opening_paragraph", "campaign_paragraph", "ask_paragraph", "closing_phrase", "signer_name", "signer_title", "charity_name", "donation_url"];
+
+  function buildCampaignParagraph(donor, config) {
+    var type = config.campaign_type;
+    if (type === "emergency_appeal") {
+      var text = BASE_PARAGRAPHS.emergency_appeal;
+      if (config.match_confirmed) {
+        text += " Thanks to a generous match from " + R.esc(config.match_sponsor) + ", your gift will be " + R.esc(config.match_terms) + ".";
+      }
+      return text;
+    }
+    if (type === "annual_fund") {
+      var lapsed = donor.status === "lapsed";
+      var t = lapsed ? BASE_PARAGRAPHS.annual_fund_lapsed : BASE_PARAGRAPHS.annual_fund;
+      var streak = parseInt(donor.streak, 10) || 0;
+      if (!lapsed && streak >= 2) t += " This gift will mark " + (streak + 1) + " years in a row you have stood with us.";
+      return t;
+    }
+    if (type === "capital_campaign") return BASE_PARAGRAPHS.capital_campaign;
+    if (type === "event_fundraiser") {
+      var e = BASE_PARAGRAPHS.event_fundraiser;
+      var count = config.event_registered_count;
+      if (count) e += " Already, " + count + " people have registered to join us.";
+      return e;
+    }
+    throw new Error("unknown campaign_type: " + type);
+  }
+
+  function buildAskParagraph(donor, config) {
+    var ask = Math.trunc(parseFloat(donor.ask_amount));
+    var lapsed = donor.status === "lapsed";
+    var line;
+    if (lapsed) {
+      line = "It would mean a great deal to have you back among our supporters.";
+      var gift = config.reengagement_gift;
+      if (gift) line += " As a thank-you for stepping back in, we would like to send you " + R.esc(gift) + ".";
+    } else {
+      line = TIER_CLOSING_LINE[donor.tier] || "";
+    }
+    return ("Today, I would like to invite you to make a gift of $" + R.fmtMoney0(ask) + ". " + line).trim();
+  }
+
+  function buildSalutation(donor) {
+    var parts = R.splitName(donor.donor_name);
+    var title = donor.title;
+    if (title) return "Dear " + R.esc(title) + " " + R.esc(parts[1]) + ",";
+    return "Dear " + R.esc(parts[0]) + " " + R.esc(parts[1]) + ",";
+  }
+
+  function buildOpeningParagraph(donor, charityName) {
+    var voice = TIER_VOICE[donor.tier];
+    var text = voice.thanks.replace("{charity}", R.esc(charityName));
+    var lifetime = parseFloat(donor.lifetime_total);
+    if (lifetime >= LIFETIME_MENTION_MINIMUM) {
+      text += " Your lifetime support of $" + R.fmtMoney0(lifetime) + " has made a real difference.";
+    }
+    return text;
+  }
+
+  function buildLetterModel(donor, config, letterDate) {
+    return {
+      donor_id: donor.donor_id,
+      letter_date: letterDate,
+      salutation: buildSalutation(donor),
+      opening_paragraph: buildOpeningParagraph(donor, config.charity_name),
+      campaign_paragraph: buildCampaignParagraph(donor, config),
+      ask_paragraph: buildAskParagraph(donor, config),
+      closing_phrase: TIER_VOICE[donor.tier].closing_phrase,
+      signer_name: R.esc(config.signer_name),
+      signer_title: R.esc(config.signer_title),
+      charity_name: R.esc(config.charity_name),
+      donation_url: R.esc(config.donation_url),
+    };
+  }
+
+  function validateLetterModel(model) {
+    var errors = [];
+    REQUIRED_LETTER_FIELDS.forEach(function (f) {
+      var v = model[f];
+      if (typeof v !== "string" || !v.trim()) errors.push("missing or empty required field: " + f);
+    });
+    var amounts = (model.ask_paragraph || "").match(/\$[\d,]+/g) || [];
+    if (amounts.length !== 1) errors.push("ask_paragraph must contain exactly 1 dollar amount, found " + amounts.length);
+    var url = model.donation_url || "";
+    if (url && url.indexOf("http://") !== 0 && url.indexOf("https://") !== 0) errors.push("donation_url must be an http(s) URL");
+    return errors;
+  }
+
+  var TEMPLATE = [
+    "<html>",
+    '<body style="font-family: Georgia; padding: 30px; max-width: 600px; color: #222;">',
+    "",
+    '  <p style="text-align:right; color: #888;">{letter_date}</p>',
+    "",
+    "  <p>{salutation}</p>",
+    "",
+    "  <p>{opening_paragraph}</p>",
+    "",
+    "  <p>{campaign_paragraph}</p>",
+    "",
+    "  <p>{ask_paragraph}</p>",
+    "",
+    "  <p>To give, simply reply to this email or visit our donation page at",
+    "  <strong>{donation_url}</strong>.</p>",
+    "",
+    "  <p>{closing_phrase},<br>",
+    "  <strong>{signer_name}</strong><br>",
+    "  {signer_title}, {charity_name}</p>",
+    "",
+    "</body>",
+    "</html>",
+  ].join("\n");
+
+  function renderLetterHtml(model) {
+    var out = TEMPLATE;
+    Object.keys(model).forEach(function (k) {
+      out = out.split("{" + k + "}").join(model[k]);
+    });
+    return out;
+  }
+
+  // Full per-donor pipeline for generation: returns {letterHtml, model, manifestNote} or {manifestNote} if no letter.
+  function generateForDonor(donor, config, letterDate) {
+    if (!donor.ask_amount) {
+      return { letterHtml: null, model: null, note: donor.review_reasons || "blocked pending data fixes" };
+    }
+    var model = buildLetterModel(donor, config, letterDate);
+    var errors = validateLetterModel(model);
+    if (errors.length) {
+      return { letterHtml: null, model: null, note: "letter schema validation failed: " + errors.join("; "), forceMandatory: true };
+    }
+    return { letterHtml: renderLetterHtml(model), model: model, note: donor.review_reasons || "" };
+  }
+
+  var App = {
+    parseCsv: parseCsv,
+    toCsv: toCsv,
+    makeZipBytes: makeZipBytes,
+    crc32: crc32,
+    validateRow: validateRow,
+    runValidation: runValidation,
+    calculateAsk: calculateAsk,
+    buildLetterModel: buildLetterModel,
+    validateLetterModel: validateLetterModel,
+    renderLetterHtml: renderLetterHtml,
+    generateForDonor: generateForDonor,
+    TIER_VOICE: TIER_VOICE,
+    BASE_PARAGRAPHS: BASE_PARAGRAPHS,
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = App;
+  } else {
+    root.App = App;
+  }
+})(typeof window !== "undefined" ? window : this);
+
+</script>
+<script>
+/* Inlined from ui.js. Edit that file, not this one; run this build script to regenerate. */
+/*
+ * State management, DOM rendering, and event wiring for the interactive
+ * donor-data-review tool. Everything here runs entirely in the browser;
+ * no network call is ever made. State lives in memory only; "Save
+ * session" writes an explicit JSON file the user chooses to download,
+ * "Load session" reads one back in. Depends on donor_rules.js (R) and
+ * app.js (App), both loaded as plain <script> tags before this file.
+ */
+(function () {
+  "use strict";
+  var R = window.DonorRules;
+  var App = window.App;
+
+  var State = {
+    config: null,
+    donors: {},            // donor_id -> raw input row (source of truth)
+    order: [],              // donor_id insertion order
+    results: {},            // donor_id -> computed result row
+    exceptions: [],
+    confirmed: {},           // donor_id -> true/false
+    confirmedSnapshot: {},   // donor_id -> JSON of donor row at confirm time
+    pendingConflicts: [],    // [{donorId, existing, incoming}]
+    manualCounter: 0,
+    changeLog: [],           // [{time, donorId, donorName, kind, description}], for the human-readable audit trail
+  };
+
+  function rowFingerprint(row) {
+    return JSON.stringify(row);
+  }
+
+  function logChange(donorId, donorName, kind, description) {
+    State.changeLog.push({
+      time: new Date().toISOString(),
+      donor_id: donorId || "",
+      donor_name: donorName || "",
+      kind: kind,
+      description: description,
+    });
+  }
+
+  // Translates the pipeline's precise-but-technical warning/review strings
+  // into plain sentences for someone without technical training, without
+  // hiding the original: callers show this first and keep the raw string
+  // available behind a "technical detail" toggle. Falls back to the raw
+  // text untouched if a pattern isn't recognized, so nothing is ever
+  // silently dropped, only re-worded when we're sure what it means.
+  function humanize(raw) {
+    if (!raw) return "";
+    var m;
+    if ((m = raw.match(/^stated tier '(.+)' disagrees with computed tier '(.+)' from lifetime_total \$([\d,]+): computed tier used$/))) {
+      return "The file said " + m[1] + " tier, but based on $" + m[3] + " in lifetime giving, this donor actually qualifies for " + m[2] + " tier. We used " + m[2] + ".";
+    }
+    if ((m = raw.match(/^stated (largest_gift|lifetime_total|last_gift_year) '(.+)' is not a number: ignored, computed value used$/))) {
+      return "The file's " + m[1].replace(/_/g, " ") + " value ('" + m[2] + "') wasn't a usable number, so we recalculated it from their actual gift history instead.";
+    }
+    if ((m = raw.match(/^stated (largest_gift|lifetime_total|last_gift_year) .+ disagrees with computed .+: computed value used$/))) {
+      return "The file's stated " + m[1].replace(/_/g, " ") + " didn't match what their gift history actually adds up to. We used the number calculated from their real gift history.";
+    }
+    if ((m = raw.match(/^computed ask \$([\d,]+) exceeds largest single gift \$([\d,]+):/))) {
+      return "This ask ($" + m[1] + ") is larger than any single gift this donor has ever given ($" + m[2] + "). Worth a second look before it goes out.";
+    }
+    if ((m = raw.match(/^lapsed (\w+) donor: route to personal outreach, no automated letter$/))) {
+      return "This is a " + m[1] + "-level donor who hasn't given in over 3 years. We recommend reaching out personally instead of sending a form letter, so no letter was generated for them.";
+    }
+    if ((m = raw.match(/^confidence ([\d.]+) is below the fail threshold ([\d.]+): blocked pending data fixes$/))) {
+      return "There were too many problems with this donor's data to safely calculate an ask. Fix the issues below and it will recalculate automatically.";
+    }
+    if ((m = raw.match(/^unrecognized volunteer value '(.*)': treated as No$/))) {
+      return "We couldn't tell from the file whether this donor volunteers (saw '" + m[1] + "'), so we assumed no.";
+    }
+    if ((m = raw.match(/^gift year\(s\) (.+) are after the campaign as_of year (\d+)$/))) {
+      return "This record lists a gift dated after " + m[2] + ", which is this campaign's reference date. That looks like a data entry error; please check the year.";
+    }
+    if ((m = raw.match(/^missing required field\(s\): (.+)$/))) {
+      return "This row is missing required information (" + m[1].replace(/_/g, " ") + ") and can't be processed until it's filled in.";
+    }
+    if ((m = raw.match(/^unparseable gift_history: (.+)$/))) {
+      return "This donor's giving history isn't in the expected format (year:amount, separated by semicolons) and couldn't be read: " + m[1];
+    }
+    if ((m = raw.match(/^duplicate donor_id, first seen at line (\d+)$/))) {
+      return "Another row earlier in this file already uses this same donor ID (line " + m[1] + "). Each donor needs a unique ID.";
+    }
+    return raw;
+  }
+
+  function humanizeList(pipeSeparated) {
+    return (pipeSeparated || "").split(" | ").filter(Boolean).map(humanize);
+  }
+
+  function nextManualId() {
+    State.manualCounter += 1;
+    var id = "M" + String(State.manualCounter).padStart(3, "0");
+    if (State.donors.hasOwnProperty(id)) return nextManualId();
+    return id;
+  }
+
+  // ---- recompute: the single place validate -> calculate -> generate runs ----
+  // Shared by the full batch recompute and the single-donor fast path:
+  // validate -> calculate -> generate for one already-validated row.
+  function computeOneDonor(record) {
+    var computed = App.calculateAsk(record, State.config);
+    var letterDate = R.letterDateLabel(State.config);
+    var gen = App.generateForDonor(computed, State.config, letterDate);
+    computed.letter_html = gen.letterHtml;
+    computed.letter_model = gen.model;
+    computed.generation_note = gen.note;
+    if (gen.forceMandatory) computed.review_level = "mandatory";
+    return computed;
+  }
+
+  function applyConfirmationCarryover(donorId) {
+    if (State.confirmed[donorId]) {
+      var fp = rowFingerprint(State.donors[donorId]);
+      if (State.confirmedSnapshot[donorId] !== fp) {
+        State.confirmed[donorId] = false;
+        delete State.confirmedSnapshot[donorId];
+      }
+    }
+  }
+
+  // Full batch recompute: every donor, plus whole-list checks (duplicate
+  // donor_id). Used whenever something changes that could affect more
+  // than one donor at once: loading a file, merging, a campaign config
+  // change (the ask formula and letter wording both depend on it).
+  function recompute() {
+    var rows = State.order.map(function (id) { return State.donors[id]; });
+    var out;
+    try {
+      out = App.runValidation(rows, State.config);
+    } catch (err) {
+      toast("Config error: " + err.message, "bad");
+      return;
+    }
+    State.exceptions = out.exceptions;
+    State.results = {};
+
+    out.validated.forEach(function (row) {
+      State.results[row.donor_id] = computeOneDonor(row);
+      applyConfirmationCarryover(row.donor_id);
+    });
+
+    // Any donor now in exceptions can't be confirmed either.
+    State.exceptions.forEach(function (exc) {
+      if (exc.donor_id) { State.confirmed[exc.donor_id] = false; }
+    });
+
+    renderAll();
+  }
+
+  // Single-donor fast path: donors are independent of each other (no
+  // donor's ask depends on another donor's data), so an edit that only
+  // touches one donor's own fields never needs to touch the other N-1.
+  // At a few thousand donors this is the difference between an edit that
+  // feels instant and one that visibly pauses the page; verified
+  // directly (2,000-donor synthetic set: ~360ms full recompute per edit
+  // vs. a single-digit-ms fast path). Duplicate-donor_id checking is a
+  // whole-list concern and is deliberately not done here: nothing that
+  // calls this path ever changes a donor's own id (the edit form doesn't
+  // expose that field), so a new duplicate cannot be created this way.
+  function recomputeDonor(donorId) {
+    var row = State.donors[donorId];
+    if (!row) return;
+    var asOfYear;
+    try {
+      asOfYear = R.asOfYear(State.config);
+    } catch (err) {
+      toast("Config error: " + err.message, "bad");
+      return;
+    }
+    var validated = App.validateRow(row, asOfYear);
+    State.exceptions = State.exceptions.filter(function (e) { return e.donor_id !== donorId; });
+    if (validated.exceptionReasons.length) {
+      State.exceptions.push({ line: 0, donor_id: donorId, donor_name: row.donor_name || "", reason: validated.exceptionReasons.join("; ") });
+      delete State.results[donorId];
+      State.confirmed[donorId] = false;
+      delete State.confirmedSnapshot[donorId];
+    } else {
+      State.results[donorId] = computeOneDonor(validated.record);
+      applyConfirmationCarryover(donorId);
+    }
+    renderAll();
+  }
+
+  function invalidateAllConfirmations(reason) {
+    Object.keys(State.confirmed).forEach(function (id) { State.confirmed[id] = false; });
+    State.confirmedSnapshot = {};
+    if (reason) toast(reason, "warn");
+  }
+
+  // Every field that differs between two donor rows, for both the
+  // conflict panel and the plain-language edit summary.
+  var COMPARABLE_FIELDS = ["donor_name", "title", "region", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"];
+  function diffRows(a, b) {
+    var diffs = [];
+    COMPARABLE_FIELDS.forEach(function (f) {
+      var av = (a && a[f]) || "", bv = (b && b[f]) || "";
+      if (String(av) !== String(bv)) diffs.push({ field: f, oldValue: av, newValue: bv });
+    });
+    return diffs;
+  }
+
+  // ---- loading / merging donor data ----
+  function loadDonorsReplace(rows) {
+    State.donors = {};
+    State.order = [];
+    State.confirmed = {};
+    State.confirmedSnapshot = {};
+    rows.forEach(function (row) {
+      var id = String(row.donor_id || "").trim() || nextManualId();
+      row.donor_id = id;
+      State.donors[id] = row;
+      State.order.push(id);
+    });
+    State.changeLog.push({ time: new Date().toISOString(), donor_id: "", donor_name: "", kind: "load", description: "Loaded " + rows.length + " donor(s), replacing the working set." });
+    recompute();
+  }
+
+  function mergeDonors(rows, sourceLabel) {
+    var conflicts = [];
+    var addedCount = 0;
+    rows.forEach(function (row) {
+      var id = String(row.donor_id || "").trim() || nextManualId();
+      row.donor_id = id;
+      if (State.donors.hasOwnProperty(id)) {
+        conflicts.push({ donorId: id, existing: State.donors[id], incoming: row, source: sourceLabel });
+      } else {
+        State.donors[id] = row;
+        State.order.push(id);
+        addedCount += 1;
+        logChange(id, row.donor_name, "merge-add", "Added from " + sourceLabel + " (new donor ID, no conflict).");
+      }
+    });
+    if (conflicts.length) {
+      State.pendingConflicts = State.pendingConflicts.concat(conflicts);
+      renderConflicts();
+      toast(conflicts.length + " donor ID(s) already exist. Resolve the conflicts below before they rejoin the working set.", "warn");
+    }
+    if (addedCount) toast("Added " + addedCount + " new donor(s) from " + sourceLabel + ".", "ok");
+    recompute();
+  }
+
+  function resolveConflict(index, choice) {
+    var c = State.pendingConflicts[index];
+    if (!c) return;
+    if (choice === "existing") {
+      logChange(c.donorId, c.existing.donor_name, "merge-conflict-resolved", "Conflict from " + c.source + ": kept the existing version.");
+    } else if (choice === "incoming") {
+      var diffs = diffRows(c.existing, c.incoming);
+      var summary = diffs.length ? diffs.map(function (d) { return d.field.replace(/_/g, " "); }).join(", ") : "no field differences detected";
+      State.donors[c.donorId] = c.incoming;
+      if (State.order.indexOf(c.donorId) === -1) State.order.push(c.donorId);
+      logChange(c.donorId, c.incoming.donor_name, "merge-conflict-resolved", "Conflict from " + c.source + ": used the incoming version (changed: " + summary + ").");
+    }
+    State.pendingConflicts.splice(index, 1);
+    renderConflicts();
+    recompute();
+  }
+
+  function addManualDonor(fields) {
+    var id = String(fields.donor_id || "").trim() || nextManualId();
+    if (State.donors.hasOwnProperty(id)) {
+      toast("donor_id '" + id + "' already exists. Choose a different ID.", "bad");
+      return false;
+    }
+    var row = {
+      donor_id: id, donor_name: fields.donor_name || "", title: fields.title || "",
+      region: fields.region || "", gift_history: fields.gift_history || "",
+      volunteer: fields.volunteer || "No", tier: "", largest_gift: "", lifetime_total: "", last_gift_year: "",
+    };
+    State.donors[id] = row;
+    State.order.push(id);
+    logChange(id, row.donor_name, "manual-add", "Added manually by the user.");
+    recompute();
+    return true;
+  }
+
+  function editDonorField(donorId, field, value) {
+    if (!State.donors[donorId]) return;
+    State.donors[donorId][field] = value;
+    logChange(donorId, State.donors[donorId].donor_name, "edit", "Field '" + field + "' changed.");
+    recomputeDonor(donorId);
+  }
+
+  function removeDonor(donorId) {
+    var name = State.donors[donorId] ? State.donors[donorId].donor_name : "";
+    delete State.donors[donorId];
+    delete State.results[donorId];
+    delete State.confirmed[donorId];
+    delete State.confirmedSnapshot[donorId];
+    State.order = State.order.filter(function (id) { return id !== donorId; });
+    logChange(donorId, name, "remove", "Removed from the working set by the user.");
+    recompute();
+  }
+
+  function confirmDonor(donorId, value) {
+    State.confirmed[donorId] = !!value;
+    if (value) {
+      State.confirmedSnapshot[donorId] = rowFingerprint(State.donors[donorId]);
+      logChange(donorId, State.donors[donorId] ? State.donors[donorId].donor_name : "", "confirm", "Reviewed and confirmed by the user.");
+    } else {
+      delete State.confirmedSnapshot[donorId];
+    }
+    renderTable();
+    renderSummary();
+    renderSteps();
+    renderChangeLog();
+    renderExportGate();
+  }
+
+  // Bulk-confirm only ever applies to the currently filtered/visible rows,
+  // and always names every donor it is about to mark before doing
+  // anything, specifically so this can't become a way to wave through
+  // donors nobody actually looked at. The point of mandatory review is
+  // the review; a bulk button that skipped that would be a HITL feature
+  // with a hole in it.
+  function bulkConfirmVisible() {
+    var ids = currentVisibleIds().filter(function (id) {
+      var r = State.results[id];
+      return r && (r.review_level === "mandatory" || r.review_level === "recommended") && !State.confirmed[id];
+    });
+    if (!ids.length) { toast("Nothing currently shown needs confirmation.", "warn"); return; }
+    var names = ids.map(function (id) { return State.results[id].donor_name; });
+    var ok = window.confirm("Mark these " + ids.length + " donor(s) as reviewed?\n\n" + names.join("\n"));
+    if (!ok) return;
+    ids.forEach(function (id) { confirmDonor(id, true); });
+    toast("Confirmed " + ids.length + " donor(s).", "ok");
+  }
+
+  // ---- session save/load (explicit, local, never automatic) ----
+  function saveSession() {
+    var payload = {
+      saved_at: new Date().toISOString(),
+      rules_version: R.RULES_VERSION,
+      config: State.config,
+      donors: State.order.map(function (id) { return State.donors[id]; }),
+      confirmed: State.confirmed,
+      confirmed_snapshot: State.confirmedSnapshot,
+      manual_counter: State.manualCounter,
+      change_log: State.changeLog,
+    };
+    downloadText(JSON.stringify(payload, null, 2), "donor-session.json", "application/json");
+  }
+
+  function loadSession(text) {
+    var payload;
+    try { payload = JSON.parse(text); } catch (e) { toast("Session file is not valid JSON.", "bad"); return; }
+    if (!payload.donors || !payload.config) { toast("Session file is missing config or donors.", "bad"); return; }
+    State.config = payload.config;
+    State.donors = {}; State.order = [];
+    payload.donors.forEach(function (row) { State.donors[row.donor_id] = row; State.order.push(row.donor_id); });
+    State.confirmed = payload.confirmed || {};
+    State.confirmedSnapshot = payload.confirmed_snapshot || {};
+    State.manualCounter = payload.manual_counter || 0;
+    State.changeLog = payload.change_log || [];
+    renderConfigForm();
+    recompute();
+    toast("Session restored (saved " + (payload.saved_at || "unknown time") + ").", "ok");
+  }
+
+  // ---- export ----
+  // "manifest" (summary) and "working set" (full modified data) are
+  // deliberately two different exports: the manifest is a short per-donor
+  // status list; the working-set CSV is every field, including anything
+  // edited or merged in, ready to be handed back to the source system.
+  function buildManifestCsv() {
+    var rows = State.order.map(function (id) {
+      var r = State.results[id];
+      if (!r) return null;
+      return {
+        donor_id: id, donor_name: r.donor_name, tier: r.tier, status: r.status,
+        ask_amount: r.ask_amount, confidence: r.confidence, review_level: r.review_level,
+        confirmed: State.confirmed[id] ? "Yes" : "No", notes: r.review_reasons,
+      };
+    }).filter(Boolean);
+    return App.toCsv(rows, ["donor_id", "donor_name", "tier", "status", "ask_amount", "confidence", "review_level", "confirmed", "notes"]);
+  }
+
+  function buildWorkingSetCsv() {
+    var rows = State.order.map(function (id) {
+      var r = State.results[id] || {};
+      var d = State.donors[id];
+      return {
+        donor_id: id, donor_name: d.donor_name, title: d.title || "", region: d.region || "",
+        gift_history: d.gift_history, tier: r.tier || "", status: r.status || "",
+        largest_gift: r.largest_gift || "", lifetime_total: r.lifetime_total || "",
+        last_gift_year: r.last_gift_year || "", volunteer: r.volunteer || d.volunteer || "",
+        ask_amount: r.ask_amount || "", confidence: r.confidence || "", review_level: r.review_level || "",
+        confirmed: State.confirmed[id] ? "Yes" : "No",
+      };
+    });
+    return App.toCsv(rows, ["donor_id", "donor_name", "title", "region", "gift_history", "tier", "status", "largest_gift", "lifetime_total", "last_gift_year", "volunteer", "ask_amount", "confidence", "review_level", "confirmed"]);
+  }
+
+  function buildChangeSummaryCsv() {
+    var rows = State.changeLog.map(function (c) {
+      return { time: c.time, donor_id: c.donor_id, donor_name: c.donor_name, type: c.kind, what_changed: c.description };
+    });
+    return App.toCsv(rows, ["time", "donor_id", "donor_name", "type", "what_changed"]);
+  }
+
+  function confirmedLetterFiles() {
+    var confirmedIds = State.order.filter(function (id) { return State.confirmed[id] && State.results[id] && State.results[id].letter_html; });
+    return confirmedIds.map(function (id) {
+      return { name: State.results[id].donor_name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + id + ".html", content: State.results[id].letter_html };
+    });
+  }
+
+  // ---- export readiness gate ----
+  // Exporting is the step that hands a batch of real dollar asks to a
+  // fundraiser to send. It is deliberately locked until every data
+  // exception is resolved, every merge conflict is settled, and every
+  // flagged donor has a human confirmation on it, the same gate the
+  // reference build enforces (its archive button stays disabled until
+  // required reviews hit 0). Before that point there is nothing to
+  // export yet, only work still in progress.
+  function exportReadiness() {
+    var total = State.order.length;
+    var excCount = State.exceptions.length;
+    var conflictCount = State.pendingConflicts.length;
+    var needsReview = State.order.filter(function (id) {
+      var r = State.results[id];
+      return r && (r.review_level === "mandatory" || r.review_level === "recommended") && !State.confirmed[id];
+    }).length;
+    return {
+      total: total, excCount: excCount, conflictCount: conflictCount, needsReview: needsReview,
+      ready: total > 0 && excCount === 0 && conflictCount === 0 && needsReview === 0,
+    };
+  }
+
+  function jumpToWork() {
+    var r = exportReadiness();
+    var selector = r.conflictCount ? '[data-tour="conflicts"]' : (r.excCount ? "#exceptionsPanel" : '[data-tour="table"]');
+    var target = document.querySelector(selector);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function renderExportGate() {
+    var btn = document.getElementById("exportBtn");
+    var msg = document.getElementById("exportGateMsg");
+    if (!btn || !msg) return;
+    var r = exportReadiness();
+    btn.disabled = !r.ready;
+    if (r.total === 0) {
+      msg.innerHTML = "Load donor data above to begin.";
+    } else if (r.ready) {
+      msg.innerHTML = "All exceptions are resolved, all merge conflicts are settled, and every flagged donor is confirmed. Ready to export.";
+    } else {
+      var parts = [];
+      if (r.excCount) parts.push(r.excCount + " data exception(s) to fix");
+      if (r.conflictCount) parts.push(r.conflictCount + " merge conflict(s) to resolve");
+      if (r.needsReview) parts.push(r.needsReview + " flagged donor(s) awaiting confirmation");
+      msg.innerHTML = "Export is locked until: " + parts.join(", ") + ". " +
+        '<button class="link" type="button" onclick="UI.jumpToWork()">Take me there</button>';
+    }
+  }
+
+  // The complete package: everything this session produced, plus the
+  // skill itself and the case for it, plus a working copy of this exact
+  // tool. Whoever receives this zip, a fundraiser using the system or
+  // Doug reviewing the case study, gets the same thing: the records, the
+  // rewritten skill, the assessment behind it, and a program they can
+  // open and rerun, not just a report about one. Nothing here needs a
+  // server or a repository checkout to make sense of. The button behind
+  // this is disabled until exportReadiness().ready, but this check stays
+  // here too since the function is reachable from the console.
+  function exportEverything() {
+    if (!exportReadiness().ready) {
+      toast("Resolve outstanding exceptions, merge conflicts, and confirmations first.", "warn");
+      return;
+    }
+    var files = [
+      { name: "manifest.csv", content: buildManifestCsv() },
+      { name: "donor-data-modified.csv", content: buildWorkingSetCsv() },
+      { name: "change-summary.csv", content: buildChangeSummaryCsv() },
+      { name: "SKILL.md", content: (window.SKILL_MD_TEXT || "") },
+      { name: "ASSESSMENT.md", content: (window.ASSESSMENT_MD_TEXT || "") },
+    ];
+    if (window.README_MD_TEXT) files.push({ name: "README.md", content: window.README_MD_TEXT });
+    var letters = confirmedLetterFiles();
+    letters.forEach(function (f) { files.push({ name: "letters/" + f.name, content: f.content }); });
+    // A working copy of this exact page, live DOM serialized back to
+    // HTML, not the original template: opening it lands on whatever was
+    // on screen when this export was made, and it is just as runnable
+    // as the file it came from, same embedded logic, same embedded data.
+    var selfCopy = "<!doctype html>\n" + document.documentElement.outerHTML;
+    files.push({ name: "donor-data-review.html", content: selfCopy });
+    downloadBytes(App.makeZipBytes(files), "donor-outreach-package.zip", "application/zip");
+    toast("Downloaded the complete package: records, SKILL.md, the assessment, and the tool itself (" + letters.length + " confirmed letter(s)), in one zip.", "ok");
+  }
+
+  function downloadBytes(bytes, filename, mime) {
+    var blob = new Blob([bytes], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function downloadText(text, filename, mime) {
+    var blob = new Blob([text], { type: mime + ";charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // ---- toast ----
+  var toastTimer = null;
+  function toast(message, kind) {
+    var el = document.getElementById("toast");
+    el.textContent = message;
+    el.className = "toast show " + (kind || "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = "toast"; }, 5000);
+  }
+
+  // ==================== RENDERING ====================
+
+  function renderAll() {
+    renderSummary();
+    renderFindings();
+    renderExceptions();
+    renderTable();
+    renderConflicts();
+    renderTierVoice();
+    renderChangeLog();
+    renderSteps();
+    renderExportGate();
+  }
+
+  function renderSteps() {
+    // Steps 3 and 4 are deliberately two different gates, not one split in
+    // half: step 3 is data-quality (rows that failed validation entirely
+    // and were excluded), step 4 is judgment (flagged donors a person has
+    // to actually confirm). A file can clear step 3 with zero exceptions
+    // and still have plenty of work left in step 4, or vice versa.
+    var total = State.order.length;
+    var excCount = State.exceptions.length;
+    var mandatory = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "mandatory"; }).length;
+    var recommended = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "recommended"; }).length;
+    var flaggedTotal = mandatory + recommended;
+    var confirmedCount = Object.keys(State.confirmed).filter(function (id) { return State.confirmed[id]; }).length;
+    var needsReview = flaggedTotal - confirmedCount;
+
+    var steps = document.querySelectorAll("#stepsTracker .step");
+    if (!steps.length) return;
+    var badge2 = document.getElementById("stepBadge2");
+    var badge3 = document.getElementById("stepBadge3");
+    var badge4 = document.getElementById("stepBadge4");
+    if (badge2) badge2.textContent = total ? (excCount ? excCount + " excluded" : "clean") : "";
+    if (badge3) badge3.textContent = total ? (excCount ? excCount + " to fix" : "none") : "";
+    if (badge4) badge4.textContent = flaggedTotal ? confirmedCount + "/" + flaggedTotal : (total ? "none needed" : "");
+
+    var step3Done = total > 0 && excCount === 0;
+    var step4Done = total > 0 && needsReview === 0;
+    var states = [
+      total > 0 ? "done" : "active",                              // 1 data loaded
+      total > 0 ? "done" : "pending",                              // 2 validated
+      total > 0 ? (step3Done ? "done" : "active") : "pending",     // 3 review & correct data errors
+      total > 0 ? (step4Done ? "done" : (step3Done ? "active" : "pending")) : "pending", // 4 sign off
+      step3Done && step4Done ? "active" : "pending",                // 5 export
+    ];
+    steps.forEach(function (el, i) {
+      el.classList.remove("done", "active");
+      if (states[i] === "done") el.classList.add("done");
+      if (states[i] === "active") el.classList.add("active");
+    });
+  }
+
+  function renderChangeLog() {
+    var el = document.getElementById("changeLogPanel");
+    if (!el) return;
+    if (!State.changeLog.length) { el.innerHTML = '<p class="badge-empty">No changes yet this session.</p>'; return; }
+    var rows = State.changeLog.slice().reverse().slice(0, 100);
+    el.innerHTML = "<table><thead><tr><th>When</th><th>Donor</th><th>What</th></tr></thead><tbody>" +
+      rows.map(function (c) {
+        var when = c.time ? new Date(c.time).toLocaleTimeString() : "";
+        return "<tr><td class=\"badge-empty\">" + R.esc(when) + "</td><td>" + R.esc(c.donor_name || c.donor_id || "(campaign-wide)") + "</td><td>" + R.esc(c.description) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  // Computed live from whatever is currently in State.results, not
+  // hardcoded: if the working data changes, this list changes with it.
+  // On the untouched sample data it reproduces the case study's own
+  // named findings; on modified or a user's own data it reports whatever
+  // is actually true of that data.
+  function renderFindings() {
+    var el = document.getElementById("findingsPanel");
+    if (!el) return;
+    var tierCorrections = [];
+    var lapsedMajor = [];
+    State.order.forEach(function (id) {
+      var r = State.results[id];
+      if (!r) return;
+      if ((r.mandatory_reasons || "").indexOf("tier corrected from") !== -1) {
+        var m = r.mandatory_reasons.match(/tier corrected from '(.+)' to '(.+)'/);
+        tierCorrections.push(r.donor_name + " (labeled " + (m ? m[1] : "?") + ", actually " + (m ? m[2] : r.tier) + " based on $" + Number(r.lifetime_total).toLocaleString() + " lifetime giving)");
+      }
+      if ((r.review_reasons || "").indexOf("route to personal outreach") !== -1) {
+        lapsedMajor.push(r.donor_name + " (" + r.tier + ", last gift " + r.last_gift_year + ")");
+      }
+    });
+    if (!tierCorrections.length && !lapsedMajor.length) {
+      el.innerHTML = '<h3>Findings in this data</h3><p class="badge-empty">No tier-label mismatches or lapsed major donors detected in the current working set.</p>';
+      return;
+    }
+    var html = "<h3>Findings in this data</h3>";
+    if (tierCorrections.length) {
+      html += "<p><strong>" + tierCorrections.length + " donor(s) had a tier label that didn't match their own lifetime giving.</strong> The file's label was overridden by the number calculated from their gift history:</p><ul style=\"margin:4px 0; padding-left:20px;\">" +
+        tierCorrections.map(function (t) { return "<li>" + R.esc(t) + "</li>"; }).join("") + "</ul>";
+    }
+    if (lapsedMajor.length) {
+      html += "<p><strong>" + lapsedMajor.length + " major donor(s) (Gold or Platinum) haven't given in over 3 years.</strong> No automated letter was generated for them; they're routed to personal outreach instead:</p><ul style=\"margin:4px 0; padding-left:20px;\">" +
+        lapsedMajor.map(function (t) { return "<li>" + R.esc(t) + "</li>"; }).join("") + "</ul>";
+    }
+    el.innerHTML = html;
+  }
+
+  function renderTierVoice() {
+    var el = document.getElementById("tierVoicePanel");
+    if (!el || !window.App || !App.TIER_VOICE) return;
+    var charity = (State.config && State.config.charity_name) || "[charity name]";
+    var order = ["Platinum", "Gold", "Silver", "Bronze"];
+    el.innerHTML = order.map(function (tier) {
+      var v = App.TIER_VOICE[tier];
+      return '<p><strong>' + tier + ':</strong> "' + R.esc(v.thanks.replace("{charity}", charity)) + '"</p>';
+    }).join("");
+  }
+
+  function renderSummary() {
+    var total = State.order.length;
+    var validCount = Object.keys(State.results).length;
+    var excCount = State.exceptions.length;
+    var tierMismatches = State.order.filter(function (id) {
+      var r = State.results[id];
+      return r && (r.mandatory_reasons || "").indexOf("tier corrected") !== -1;
+    }).length;
+    var generated = State.order.filter(function (id) { return State.results[id] && State.results[id].letter_html; }).length;
+    var mandatory = State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "mandatory"; }).length;
+    var confirmedCount = Object.keys(State.confirmed).filter(function (id) { return State.confirmed[id]; }).length;
+    var needsReview = State.order.filter(function (id) {
+      var r = State.results[id];
+      return r && (r.review_level === "mandatory" || r.review_level === "recommended") && !State.confirmed[id];
+    }).length;
+
+    var stats = [
+      [total, "Donors loaded"],
+      [validCount, "Validated"],
+      [excCount, "Exceptions"],
+      [tierMismatches, "Tier labels corrected"],
+      [generated, "Letters generated"],
+      [mandatory, "Mandatory review"],
+      [confirmedCount, "Confirmed"],
+      [needsReview, "Awaiting confirmation"],
+    ];
+    document.getElementById("summaryStats").innerHTML = stats.map(function (s) {
+      return '<div class="stat"><div class="num">' + s[0] + '</div><div class="label">' + s[1] + '</div></div>';
+    }).join("");
+
+    var allReady = needsReview === 0 && total > 0;
+    var banner = document.getElementById("readyBanner");
+    if (allReady) {
+      banner.className = "panel ready-banner ok";
+      banner.textContent = "All flagged donors are confirmed. Data ties out. Ready to export.";
+    } else if (total === 0) {
+      banner.className = "panel ready-banner";
+      banner.textContent = "Load a donor file to begin.";
+    } else {
+      banner.className = "panel ready-banner warn";
+      banner.textContent = needsReview + " donor(s) still need human confirmation before this batch is ready (see the Review column).";
+    }
+
+    var flaggedTotal = mandatory + State.order.filter(function (id) { return State.results[id] && State.results[id].review_level === "recommended"; }).length;
+    var flaggedConfirmed = flaggedTotal - needsReview;
+    var pct = flaggedTotal > 0 ? Math.round((flaggedConfirmed / flaggedTotal) * 100) : (total > 0 ? 100 : 0);
+    var fill = document.getElementById("progressFill");
+    if (fill) {
+      fill.style.width = pct + "%";
+      fill.title = flaggedConfirmed + " of " + flaggedTotal + " flagged donor(s) reviewed";
+    }
+  }
+
+  function renderExceptions() {
+    var el = document.getElementById("exceptionsPanel");
+    if (!State.exceptions.length) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.style.display = "block";
+    el.innerHTML = "<h3>Exceptions: " + State.exceptions.length + " row(s) excluded</h3>" +
+      "<table><thead><tr><th>Donor</th><th>Reason</th></tr></thead><tbody>" +
+      State.exceptions.map(function (e) {
+        return "<tr><td>" + R.esc(e.donor_name || e.donor_id) + "</td><td>" + R.esc(e.reason) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+
+  function renderConflicts() {
+    var el = document.getElementById("conflictPanel");
+    if (!State.pendingConflicts.length) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.style.display = "block";
+    el.innerHTML = "<h3>Merge conflicts: " + State.pendingConflicts.length + "</h3><p class=\"sub\">These donor IDs already exist in the working set. Nothing is changed automatically; pick which version to keep for each one.</p>" +
+      State.pendingConflicts.map(function (c, i) {
+        var diffs = diffRows(c.existing, c.incoming);
+        var diffTable = diffs.length
+          ? "<table><thead><tr><th>Field</th><th>Existing</th><th>Incoming</th></tr></thead><tbody>" +
+            diffs.map(function (d) {
+              return "<tr><td>" + R.esc(d.field.replace(/_/g, " ")) + "</td><td>" + R.esc(d.oldValue) + "</td><td>" + R.esc(d.newValue) + "</td></tr>";
+            }).join("") + "</tbody></table>"
+          : '<p class="badge-empty">No field differences detected between the two versions.</p>';
+        return '<div class="conflict-row">' +
+          '<div><strong>' + R.esc(c.existing.donor_name || c.incoming.donor_name) + '</strong> <span class="badge-empty">' + R.esc(c.donorId) + ', from ' + R.esc(c.source) + '</span></div>' +
+          diffTable +
+          '<div class="controls">' +
+          '<button onclick="UI.resolveConflict(' + i + ', \'existing\')">Keep existing</button>' +
+          '<button onclick="UI.resolveConflict(' + i + ', \'incoming\')">Use incoming</button>' +
+          '</div></div>';
+      }).join("");
+  }
+
+  var sortKey = null;
+  var sortDir = 1;
+
+  function setSort(key) {
+    if (sortKey === key) { sortDir = -sortDir; } else { sortKey = key; sortDir = 1; }
+    document.querySelectorAll("th[data-key]").forEach(function (th) {
+      th.classList.remove("sort-asc", "sort-desc");
+      if (th.dataset.key === sortKey) th.classList.add(sortDir === 1 ? "sort-asc" : "sort-desc");
+    });
+    renderTable();
+  }
+
+  function currentVisibleIds() {
+    var q = (document.getElementById("search").value || "").toLowerCase();
+    var tierFilter = document.getElementById("tierFilter").value;
+    var reviewFilter = document.getElementById("reviewFilter").value;
+    var ids = State.order.filter(function (id) {
+      var r = State.results[id];
+      if (!r) return false;
+      if (tierFilter && r.tier !== tierFilter) return false;
+      if (reviewFilter && r.review_level !== reviewFilter) return false;
+      if (q && !((r.donor_name || "").toLowerCase().indexOf(q) !== -1 || id.toLowerCase().indexOf(q) !== -1)) return false;
+      return true;
+    });
+    if (sortKey) {
+      ids = ids.slice().sort(function (a, b) {
+        var av = State.results[a][sortKey], bv = State.results[b][sortKey];
+        var an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) { av = an; bv = bn; } else { av = String(av || "").toLowerCase(); bv = String(bv || "").toLowerCase(); }
+        if (av < bv) return -sortDir;
+        if (av > bv) return sortDir;
+        return 0;
+      });
+    }
+    return ids;
+  }
+
+  function renderTable() {
+    var body = document.getElementById("donorTableBody");
+    var ids = currentVisibleIds();
+
+    body.innerHTML = ids.map(function (id) {
+      var r = State.results[id];
+      var pillClass = r.review_level === "mandatory" ? "bad" : (r.review_level === "recommended" ? "warn" : "ok");
+      var confirmed = !!State.confirmed[id];
+      var needsAttention = (r.review_level === "mandatory" || r.review_level === "recommended");
+      return '<tr class="row' + (needsAttention && !confirmed ? " needs-attention" : "") + '">' +
+        '<td>' + R.esc(r.donor_name) + ' <span class="badge-empty">' + R.esc(id) + '</span></td>' +
+        '<td>' + R.esc(r.tier) + (r.tier === "Platinum" ? ' <span class="pill bad">always review</span>' : "") + '</td>' +
+        '<td>' + R.esc(r.status) + '</td>' +
+        '<td>' + (r.ask_amount ? "$" + Number(r.ask_amount).toLocaleString() : "n/a") + '</td>' +
+        '<td>' + R.esc(r.confidence) + '</td>' +
+        '<td><span class="pill ' + pillClass + '">' + R.esc(r.review_level) + '</span></td>' +
+        '<td><label><input type="checkbox" ' + (confirmed ? "checked" : "") + (needsAttention ? "" : " disabled") + ' onchange="UI.confirmDonor(\'' + id + '\', this.checked)"> confirm</label></td>' +
+        '<td>' +
+        '<button class="link" onclick="UI.openLetter(\'' + id + '\')">letter</button> ' +
+        '<button class="link" onclick="UI.openEdit(\'' + id + '\')">edit</button> ' +
+        '<button class="link" onclick="UI.removeDonor(\'' + id + '\')">remove</button>' +
+        '</td></tr>';
+    }).join("");
+  }
+
+  function renderConfigForm() {
+    var c = State.config;
+    ["campaign_type", "as_of_date", "charity_name", "donation_url", "signer_name", "signer_title", "match_sponsor", "match_terms", "event_registered_count", "reengagement_gift"].forEach(function (f) {
+      var el = document.getElementById("cfg_" + f);
+      if (el) el.value = c[f] == null ? "" : c[f];
+    });
+    document.getElementById("cfg_match_confirmed").checked = !!c.match_confirmed;
+  }
+
+  function applyConfigForm() {
+    var c = {};
+    ["campaign_type", "as_of_date", "charity_name", "donation_url", "signer_name", "signer_title", "match_sponsor", "match_terms", "reengagement_gift"].forEach(function (f) {
+      c[f] = document.getElementById("cfg_" + f).value.trim();
+    });
+    c.match_confirmed = document.getElementById("cfg_match_confirmed").checked;
+    var count = document.getElementById("cfg_event_registered_count").value.trim();
+    c.event_registered_count = count ? parseInt(count, 10) : null;
+    try {
+      R.validateCampaignConfig(c);
+    } catch (err) {
+      // Reject the change without corrupting state, and put the form back
+      // to what is actually still in effect so the screen never shows a
+      // value that doesn't match reality (e.g. a browser-rejected date
+      // input left blank while the real setting is untouched).
+      toast(err.message, "bad");
+      renderConfigForm();
+      return;
+    }
+    var changedFields = Object.keys(c).filter(function (f) { return String(State.config[f]) !== String(c[f]); });
+    State.config = c;
+    logChange("", "", "campaign-settings", "Campaign settings changed (" + (changedFields.join(", ") || "no visible change") + "). All confirmations reset.");
+    invalidateAllConfirmations("Campaign settings changed. All confirmations reset; every flagged donor needs review again.");
+    recompute();
+    toast("Campaign settings applied.", "ok");
+  }
+
+  // ---- letter / edit modals ----
+  function openLetter(donorId) {
+    var r = State.results[donorId];
+    var view = document.getElementById("letterView");
+    var body = document.getElementById("letterBody");
+    var extra = "";
+    if (r.ask_trace) extra += '<div style="padding:10px 14px;"><strong>How the ask amount was calculated</strong><div class="trace">' + R.esc(r.ask_trace.split(" -> ").join("\n-> ")) + '</div></div>';
+    var plain = humanizeList(r.warnings);
+    var mandatoryPlain = humanizeList(r.review_reasons);
+    var noteLines = mandatoryPlain.concat(plain.filter(function (p) { return mandatoryPlain.indexOf(p) === -1; }));
+    if (noteLines.length) {
+      extra += '<div style="padding:0 14px 14px;"><strong>What we found, in plain terms</strong><ul style="margin:6px 0 0; padding-left:20px;">' +
+        noteLines.map(function (p) { return "<li>" + R.esc(p) + "</li>"; }).join("") + '</ul>' +
+        '<details style="margin-top:6px;"><summary class="badge-empty">Technical detail</summary><div class="trace">' + R.esc((r.warnings + (r.warnings && r.review_reasons ? " | " : "") + r.review_reasons).split(" | ").filter(Boolean).join("\n")) + '</div></details></div>';
+    }
+    var confirmBtn = (r.review_level !== "none") ? '<button class="primary" onclick="UI.confirmDonor(\'' + donorId + '\', ' + (!State.confirmed[donorId]) + '); UI.openLetter(\'' + donorId + '\')">' + (State.confirmed[donorId] ? "Unconfirm" : "Confirm this letter") + '</button>' : '<p class="badge-empty">No review needed for this donor.</p>';
+    if (r.letter_html) {
+      body.innerHTML = extra + '<div style="padding:0 14px;">' + confirmBtn + '</div><iframe style="width:100%;height:480px;border:1px solid #eee;border-radius:8px;margin-top:8px;" srcdoc="' + r.letter_html.replace(/"/g, "&quot;") + '"></iframe>';
+    } else {
+      body.innerHTML = extra + '<div style="padding:14px;"><strong>No letter was generated for this donor.</strong> ' + R.esc(humanize(r.generation_note) || "") + '</div>';
+    }
+    view.classList.add("open");
+  }
+  function closeLetter() { document.getElementById("letterView").classList.remove("open"); }
+
+  function openEdit(donorId) {
+    var row = State.donors[donorId];
+    var view = document.getElementById("editView");
+    document.getElementById("editDonorId").textContent = donorId;
+    ["donor_name", "title", "region", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
+      var el = document.getElementById("edit_" + f);
+      if (el) el.value = row[f] || "";
+    });
+    document.getElementById("editImpact").innerHTML = "";
+    view.dataset.donorId = donorId;
+    view.classList.add("open");
+  }
+  function closeEdit() { document.getElementById("editView").classList.remove("open"); }
+  function saveEdit() {
+    var donorId = document.getElementById("editView").dataset.donorId;
+    var before = State.results[donorId] ? {
+      tier: State.results[donorId].tier, status: State.results[donorId].status,
+      ask_amount: State.results[donorId].ask_amount, review_level: State.results[donorId].review_level,
+    } : null;
+    ["donor_name", "title", "region", "gift_history", "largest_gift", "lifetime_total", "last_gift_year", "tier", "volunteer"].forEach(function (f) {
+      var el = document.getElementById("edit_" + f);
+      if (el) State.donors[donorId][f] = el.value;
+    });
+    recomputeDonor(donorId);
+    var after = State.results[donorId];
+    var lines = [];
+    if (!after) {
+      lines.push("This donor could not be validated after the change; see Exceptions above for the specific reason.");
+    } else if (before) {
+      if (before.tier !== after.tier) lines.push("Tier changed from " + before.tier + " to " + after.tier + ".");
+      if (before.status !== after.status) lines.push("Status changed from " + before.status + " to " + after.status + ".");
+      if (before.ask_amount !== after.ask_amount) {
+        var b = before.ask_amount ? "$" + Number(before.ask_amount).toLocaleString() : "no ask";
+        var a = after.ask_amount ? "$" + Number(after.ask_amount).toLocaleString() : "no ask";
+        lines.push("Ask amount changed from " + b + " to " + a + ".");
+      }
+      if (before.review_level !== after.review_level) lines.push("Review status changed from '" + before.review_level + "' to '" + after.review_level + "'" + (after.review_level !== "none" ? ", so this donor now needs to be confirmed again." : ".") );
+      if (!lines.length) lines.push("Recalculated. Nothing about this donor's tier, ask, or review status changed as a result.");
+    }
+    document.getElementById("editImpact").innerHTML = '<div class="panel" style="background:var(--accent-soft); border-color:var(--accent);"><strong>What changed:</strong><ul style="margin:6px 0 0; padding-left:20px;">' +
+      lines.map(function (l) { return "<li>" + R.esc(l) + "</li>"; }).join("") + "</ul></div>";
+    renderTable();
+    toast("Donor updated and recomputed.", "ok");
+  }
+
+  // ---- file upload ----
+  function handleFileUpload(fileInput, mode) {
+    var file = fileInput.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var rows = App.parseCsv(String(reader.result));
+      if (!rows.length) { toast("No rows found in that file.", "bad"); return; }
+      if (mode === "replace") loadDonorsReplace(rows);
+      else mergeDonors(rows, file.name);
+      fileInput.value = "";
+    };
+    reader.readAsText(file);
+  }
+
+  function handleSessionUpload(fileInput) {
+    var file = fileInput.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () { loadSession(String(reader.result)); fileInput.value = ""; };
+    reader.readAsText(file);
+  }
+
+  // ---- init ----
+  function init(sampleCsvText, defaultConfig) {
+    State.config = defaultConfig;
+    renderConfigForm();
+    loadDonorsReplace(App.parseCsv(sampleCsvText));
+    ["search", "tierFilter", "reviewFilter"].forEach(function (id) {
+      document.getElementById(id).addEventListener("input", renderTable);
+      document.getElementById(id).addEventListener("change", renderTable);
+    });
+    document.querySelectorAll("th[data-key]").forEach(function (th) {
+      th.addEventListener("click", function () { setSort(th.dataset.key); });
+    });
+    document.querySelectorAll("#stepsTracker .step").forEach(function (stepEl) {
+      stepEl.addEventListener("click", function () {
+        var target = document.querySelector('[data-tour="' + stepEl.dataset.jump + '"]');
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+  }
+
+  function showPageError(message) {
+    var el = document.getElementById("pageError");
+    if (!el) { window.alert("Error: " + message); return; }
+    el.style.display = "block";
+    el.innerHTML = "<strong>Something went wrong:</strong> " + R.esc(message) +
+      "<br>Try reloading the page. If it keeps happening, open the browser console (F12) and share what it shows.";
+  }
+
+  // ---- guided tour: highlight and scroll to each major section in turn.
+  // No audio (Bryan is recording his own narration); this is just
+  // navigation and a caption per step.
+  var TOUR_STEPS = [
+    { sel: '[data-tour="findings"]', text: "Every number here is the real output of validating the loaded data live, right now, in this browser. This panel names the exact donors whose tier label didn't match their own giving, and any major donor who's lapsed." },
+    { sel: '[data-tour="settings"]', text: "Campaign settings. Changing any of these recomputes every donor and clears every confirmation, since the ask amount and letter wording both depend on these values." },
+    { sel: '[data-tour="donordata"]', text: "Replace the whole list, merge in more from a second file, or add one donor by hand. Nothing here touches a server; it's all read and processed in this tab." },
+    { sel: '[data-tour="table"]', text: "The donor table. Click any column header to sort. Edit a donor and watch tier, ask, and letter recompute immediately, with a plain-language summary of exactly what changed." },
+    { sel: '[data-tour="export"]', text: "When you're done, export everything as one zip: the manifest, the full modified dataset, the change log, and every confirmed letter as its own file." },
+  ];
+  var tourIndex = -1;
+  function startTour() {
+    tourIndex = 0;
+    document.getElementById("tourStart").style.display = "none";
+    ["tourNext", "tourBack", "tourEnd"].forEach(function (id) { document.getElementById(id).style.display = ""; });
+    showTourStep();
+  }
+  function tourStep(delta) {
+    tourIndex = Math.max(0, Math.min(TOUR_STEPS.length - 1, tourIndex + delta));
+    showTourStep();
+  }
+  function showTourStep() {
+    document.querySelectorAll(".spotlight").forEach(function (el) { el.classList.remove("spotlight"); });
+    var step = TOUR_STEPS[tourIndex];
+    var el = document.querySelector(step.sel);
+    if (el) { el.classList.add("spotlight"); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    document.getElementById("tourCaption").textContent = "(" + (tourIndex + 1) + "/" + TOUR_STEPS.length + ") " + step.text;
+  }
+  function endTour() {
+    document.querySelectorAll(".spotlight").forEach(function (el) { el.classList.remove("spotlight"); });
+    tourIndex = -1;
+    document.getElementById("tourStart").style.display = "";
+    ["tourNext", "tourBack", "tourEnd"].forEach(function (id) { document.getElementById(id).style.display = "none"; });
+    document.getElementById("tourCaption").textContent = "A short, guided tour of what this page actually does, if you want it.";
+  }
+
+  window.UI = {
+    init: init,
+    applyConfigForm: applyConfigForm,
+    loadDonorsReplace: loadDonorsReplace,
+    mergeDonors: mergeDonors,
+    handleFileUpload: handleFileUpload,
+    handleSessionUpload: handleSessionUpload,
+    resolveConflict: resolveConflict,
+    addManualDonor: addManualDonor,
+    editDonorField: editDonorField,
+    removeDonor: removeDonor,
+    confirmDonor: confirmDonor,
+    openLetter: openLetter,
+    closeLetter: closeLetter,
+    openEdit: openEdit,
+    closeEdit: closeEdit,
+    saveEdit: saveEdit,
+    saveSession: saveSession,
+    loadSession: loadSession,
+    exportEverything: exportEverything,
+    jumpToWork: jumpToWork,
+    bulkConfirmVisible: bulkConfirmVisible,
+    startTour: startTour,
+    tourStep: tourStep,
+    endTour: endTour,
+    showPageError: showPageError,
+    renderTable: renderTable,
+    State: State,
+  };
+})();
+
+</script>
+<script>
+// Belt-and-suspenders: this page has no server to log an error to, so an
+// uncaught exception must never just leave a blank or frozen screen with
+// no explanation. Every failure path ends up visible, in plain language,
+// right on the page.
+window.addEventListener('error', function (event) {
+  if (window.UI && UI.showPageError) UI.showPageError(event.message);
+});
+window.addEventListener('unhandledrejection', function (event) {
+  if (window.UI && UI.showPageError) UI.showPageError(String(event.reason && event.reason.message || event.reason));
+});
+
+function UI_addDonor() {
+  var ok = UI.addManualDonor({
+    donor_id: document.getElementById('add_donor_id').value,
+    donor_name: document.getElementById('add_donor_name').value,
+    title: document.getElementById('add_title').value,
+    region: document.getElementById('add_region').value,
+    gift_history: document.getElementById('add_gift_history').value,
+    volunteer: document.getElementById('add_volunteer').value,
+  });
+  if (ok) {
+    ['add_donor_id','add_donor_name','add_title','add_region','add_gift_history'].forEach(function(id){
+      document.getElementById(id).value = '';
+    });
+  }
+}
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    UI.init(SAMPLE_DONORS_CSV, DEFAULT_CAMPAIGN_CONFIG);
+  } catch (err) {
+    UI.showPageError(err.message);
+  }
+});
+</script>
+</body>
+</html>
