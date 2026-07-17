@@ -5,8 +5,7 @@ Prepared by Bryan Shaw.
 ## Summary
 
 The original skill reads as reasonable prose and fails at every layer that
-matters once it has to run more than once. It embeds its data instead of
-reading it, trusts labels its own data contradicts, asks a language model
+matters, by embeding its own unverified data, then builds trusts labels its own data contradicts, asks a language model
 to do arithmetic, invents facts when data is missing, and instructs the
 assistant to make an untrue claim to donors. None of that announces
 itself. Each failure produces a confident, well-formatted, wrong letter.
