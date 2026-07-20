@@ -1,18 +1,15 @@
 # The original skill, annotated
 
-`ORIGINAL-SKILL.md` in this folder is the charity donor outreach skill exactly
-as I received it for the case study, unedited. This file is my section by
-section review of that original: what each instruction was, the specific
-problem it creates once the skill has to run more than once, and the
-deterministic code in this repository that replaces the guessed step.
+This file is my 8 section review of that original: what each instruction was, the specific
+problem it creates with reliable, consistent/repeatable scalablility. 
 
-The idea behind every change is the same. Verify the data first, then let
+- 1st deterministic code replaces the assumptions, gates the source of truth, applies gaurdrails and allows for audit trail. 
+
+- The idea behind every change is the same. Verify the data first, then let
 deterministic code own anything with one correct answer. The language model
 never runs the batch, which is what keeps the result identical on every run
 and the cost flat as the donor list grows. A person reviews by exception, and
 the highest stakes steps are gated so nothing ships without a human decision.
-
-Every code block below is the real function from `scripts/`, not a paraphrase.
 
 ## 1. Trigger description
 
