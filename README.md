@@ -45,7 +45,9 @@ is there for offline use and as proof the tool needs nothing but itself.
 3. **[SKILL.md](SKILL.md)** is the rewritten skill an AI agent reads for
    the batch/automated path.
 4. **[references/policy.md](references/policy.md)** is the single source
-   of truth every rule below traces back to.
+   of truth every rule below traces back to. Also, I wanted to refrence a
+   couple of articles I have written on the "AI Harness" for enterprise
+   clients and building agentic systems. https://www.inflexis.ai/insights/the-harness-is-load-bearing
 
 ## How this is built: two front doors, one policy
 
