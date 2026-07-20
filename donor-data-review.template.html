@@ -165,6 +165,9 @@ th[data-key].sort-desc::after { content:"\25BC"; opacity:1; color:var(--accent);
     <button onclick="UI.tourStep(1)" style="display:none;" id="tourNext">Next</button>
     <button class="secondary" onclick="UI.tourStep(-1)" style="display:none;" id="tourBack">Back</button>
     <button class="secondary" onclick="UI.endTour()" style="display:none;" id="tourEnd">End walkthrough</button>
+    <button class="secondary" onclick="UI.tourReplayAudio()" style="display:none;" id="tourReplay">&#128266; Replay narration</button>
+    <button class="secondary" onclick="UI.tourToggleMute()" style="display:none;" id="tourMute">Mute narration</button>
+    <audio id="tourAudio" preload="none"></audio>
   </div>
   <div class="tour-caption" id="tourCaption">A guided walkthrough of what this page does, why it's built this way, and what to check before you run it with real data, if you want it.</div>
 </div>
