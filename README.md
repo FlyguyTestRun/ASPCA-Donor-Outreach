@@ -19,6 +19,14 @@ open more reliably than a local double-click, since some browsers restrict
 how a page opened directly from disk is allowed to behave; the local file
 is there for offline use and as proof the tool needs nothing but itself.
 
+## Watch the review
+
+A recorded walkthrough of the original skill, section by section, with the
+problems and the fixes: [`media/SKILLmdREVIEW.mp4`](media/SKILLmdREVIEW.mp4)
+(about five minutes). The narration that plays inside the interactive tool's
+guided walkthrough is also here as one continuous track:
+[`media/html-walkthrough-narration.mp3`](media/html-walkthrough-narration.mp3).
+
 ## Contents
 
 - [Where to start](#where-to-start)
