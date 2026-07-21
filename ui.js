@@ -1260,7 +1260,7 @@
   // separately over this.
   var TOUR_STEPS = [
     {
-      sel: null,
+      sel: '[data-tour="pipeline-diagram"]',
       audio: "walkthrough/step1.mp3",
       title: "Welcome: this page is the whole tool",
       text: "Everything here runs in your browser as plain, deterministic code. No AI ever touches your donor data. This walkthrough takes you through five stages, from checking your data to exporting finished letters.",
@@ -1268,7 +1268,7 @@
       prompt: "Press play to hear it, or click Next to begin.",
     },
     {
-      sel: '[data-tour="settings"]',
+      sel: '[data-tour="cfgfrom"]',
       audio: "walkthrough/step2.mp3",
       title: "Who is the campaign from?",
       text: "Set your charity name, donation link, and the person signing the letters. These appear on every letter, so the tool never invents them.",
@@ -1276,7 +1276,7 @@
       prompt: null,
     },
     {
-      sel: '[data-tour="settings"]',
+      sel: '[data-tour="cfglevers"]',
       audio: "walkthrough/step3.mp3",
       title: "Two big levers: the date and the campaign type",
       text: "The as-of date decides who counts as lapsed and who earns a loyalty bump. The campaign type sets the message. Change either one and the impact summary shows exactly what shifted before you commit.",
@@ -1322,8 +1322,11 @@
   function showTourStep() {
     document.querySelectorAll(".spotlight").forEach(function (el) { el.classList.remove("spotlight"); });
     var step = TOUR_STEPS[tourIndex];
-    var el = step.sel ? document.querySelector(step.sel) : null;
-    if (el) { el.classList.add("spotlight"); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    var els = step.sel ? document.querySelectorAll(step.sel) : [];
+    if (els.length) {
+      els.forEach(function (e) { e.classList.add("spotlight"); });
+      els[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     var html = '<span class="tour-step-label">Step ' + (tourIndex + 1) + " of " + TOUR_STEPS.length + '</span>' +
       '<span class="tour-title">' + step.title + '</span>' +
       '<span class="tour-text">' + step.text + '</span>';
